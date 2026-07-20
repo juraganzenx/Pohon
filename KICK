@@ -4,7 +4,7 @@ local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 
 local CHECK_DELAY = 1
-local TIME_LIMIT = 60 -- 1 menit
+local TIME_LIMIT = 120 -- 1 menit
 
 local lastCount = 0
 local lastChange = tick()
