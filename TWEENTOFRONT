@@ -1,0 +1,75 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local WAIT_BEFORE_JUMP = 5
+local WAIT_AFTER_JUMP = 5
+local WAIT_AFTER_TWEEN = 60
+local SPEED = 50
+
+--------------------------------------------------
+-- FUNCTION
+--------------------------------------------------
+
+local function GetMyPlot()
+    local Gardens = workspace:WaitForChild("Gardens")
+
+    for _, Plot in ipairs(Gardens:GetChildren()) do
+        if Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            return Plot
+        end
+    end
+end
+
+--------------------------------------------------
+-- LOOP
+--------------------------------------------------
+
+while true do
+    local Plot = GetMyPlot()
+
+    if Plot then
+        local BottomFace = Plot.Visual.FRONT_BedSection.BottomFace
+
+        local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+        local HRP = Character:FindFirstChild("HumanoidRootPart")
+
+        if Humanoid and HRP and Humanoid.Health > 0 then
+
+            -- Tunggu sebelum jump
+            task.wait(WAIT_BEFORE_JUMP)
+
+            -- Jump
+            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+
+            -- Tunggu setelah jump
+            task.wait(WAIT_AFTER_JUMP)
+
+            -- Tween
+            local TargetPos = BottomFace.Position + Vector3.new(0, BottomFace.Size.Y / 2 + 3, 0)
+            local Distance = (HRP.Position - TargetPos).Magnitude
+
+            local Tween = TweenService:Create(
+                HRP,
+                TweenInfo.new(Distance / SPEED, Enum.EasingStyle.Linear),
+                {
+                    CFrame = CFrame.new(TargetPos)
+                }
+            )
+
+            Tween:Play()
+            Tween.Completed:Wait()
+        end
+    else
+        warn("Plot tidak ditemukan.")
+    end
+
+    -- Tunggu sebelum mengulang
+    task.wait(WAIT_AFTER_TWEEN)
+end
