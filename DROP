@@ -1,4 +1,4 @@
--- DROP JIKA LAGI EQUIP (MULTI ITEM)
+--DROP FRUIT PROJECT MULTI
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,10 +12,10 @@ local Networking = require(ReplicatedStorage.SharedModules.Networking)
 
 local TARGETS = {
     "Moon Bloom",
-    "Star Fruit"
+    "Star Fruit",
 }
 
-local DELAY = 0.2
+local DELAY = 1
 
 
 --------------------------------------------------
@@ -37,26 +37,67 @@ end
 
 
 --------------------------------------------------
--- FIND EQUIPPED TOOL
+-- FUNCTION EQUIP FRUIT
 --------------------------------------------------
 
-local function FindEquippedTool()
+local function EquipFruit()
+
+    local GridFrame = LocalPlayer.PlayerGui.BackpackGui.Backpack.Inventory.ScrollingFrame.UIGridFrame
+
+    for _, Button in ipairs(GridFrame:GetChildren()) do
+
+        if Button:IsA("TextButton") then
+
+            local ToolName = Button:FindFirstChild("ToolName")
+
+            if ToolName and IsTarget(ToolName.ContentText) then
+
+                print("Equip:", ToolName.ContentText)
+
+                if firesignal then
+                    firesignal(Button.MouseButton1Click)
+                else
+                    for _, conn in ipairs(getconnections(Button.MouseButton1Click)) do
+                        conn:Fire()
+                    end
+                end
+
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+
+--------------------------------------------------
+-- FIND TOOL
+--------------------------------------------------
+
+local function FindTool()
 
     local Character = LocalPlayer.Character
 
-    if not Character then
-        return nil
+    if Character then
+        for _, Tool in ipairs(Character:GetChildren()) do
+
+            if Tool:IsA("Tool") and IsTarget(Tool.Name) then
+                return Tool
+            end
+
+        end
     end
 
 
-    for _, Tool in ipairs(Character:GetChildren()) do
+    local Backpack = LocalPlayer.Backpack
 
-        if Tool:IsA("Tool")
-        and IsTarget(Tool.Name) then
+    for _, Tool in ipairs(Backpack:GetChildren()) do
 
+        if Tool:IsA("Tool") and IsTarget(Tool.Name) then
             return Tool
-
         end
+
     end
 
 
@@ -70,28 +111,47 @@ end
 
 while task.wait(DELAY) do
 
-    local Tool = FindEquippedTool()
+    local Tool = FindTool()
 
+
+    -- equip jika belum ada
+    if not Tool then
+
+        local Success = EquipFruit()
+
+        if Success then
+            print("Menunggu equip...")
+        end
+
+        task.wait(0.2)
+
+        Tool = FindTool()
+    end
+
+
+
+    --------------------------------------------------
+    -- DROP
+    --------------------------------------------------
 
     if Tool then
 
         local Id = Tool:GetAttribute("Id")
 
-
         if Id then
 
             print("Drop:", Tool.Name, Id)
-
 
             Networking.DroppedItem.RequestDrop:Fire(
                 "HarvestedFruits",
                 Id
             )
 
+            task.wait(0.2)
 
         else
 
-            warn("Tool tidak punya Id:", Tool.Name)
+            warn("Tidak ada Id:", Tool.Name)
 
         end
     end
