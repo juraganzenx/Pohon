@@ -1,4 +1,4 @@
---DESTROY FRUIT AND PLANT PROJECT
+--DESTROY FRUIT AND PLANT PROJECTS
 local Gardens = workspace:WaitForChild("Gardens")
 
 while true do
