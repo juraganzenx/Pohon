@@ -1,4 +1,4 @@
--- EQUIP ALL -> WAIT TOOL -> DROP QUEUE SYSTEM
+-- EQUIP ALL -> WAIT ALL TOOL -> DROP QUEUE SYSTEM V22
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,14 +17,16 @@ local TARGETS = {
 }
 
 local SCAN_DELAY = 1
-local EQUIP_WAIT = 1
+local EQUIP_DELAY = 0.5
+local EQUIP_TIMEOUT = 10
+
 local DROP_CHECK_DELAY = 0.1
 local DROP_TIMEOUT = 5
 
 
 
 --------------------------------------------------
--- CHECK TARGET
+-- TARGET CHECK
 --------------------------------------------------
 
 local function IsTarget(Name)
@@ -35,11 +37,13 @@ local function IsTarget(Name)
         or Name:sub(1, #Target) == Target then
 
             return true
+
         end
 
     end
 
     return false
+
 end
 
 
@@ -67,8 +71,7 @@ end
 
 
 --------------------------------------------------
--- STEP 1
--- SCAN UI ITEM
+-- SCAN SEMUA ITEM DI UI
 --------------------------------------------------
 
 local function ScanTargets()
@@ -83,6 +86,7 @@ local function ScanTargets()
     if not BackpackGui then
         return Result
     end
+
 
 
     local GridFrame =
@@ -100,23 +104,28 @@ local function ScanTargets()
                 Button:FindFirstChild("ToolName")
 
 
+
             if ToolName
             and IsTarget(ToolName.ContentText) then
 
 
-                table.insert(Result,{
+                table.insert(Result, {
                     Button = Button,
                     Name = ToolName.ContentText
                 })
 
 
             end
+
+
         end
+
 
     end
 
 
-    print("Scan ditemukan:", #Result)
+
+    print("SCAN:", #Result)
 
 
     return Result
@@ -125,10 +134,8 @@ end
 
 
 
-
 --------------------------------------------------
--- STEP 2
--- EQUIP ALL
+-- EQUIP SEMUA
 --------------------------------------------------
 
 local function EquipAll(List)
@@ -141,15 +148,16 @@ local function EquipAll(List)
         and Data.Button.Parent then
 
 
-            print("Equip:", Data.Name)
+            print("EQUIP:", Data.Name)
 
 
             ClickButton(Data.Button)
 
 
-            task.wait(0.5)
+            task.wait(EQUIP_DELAY)
 
         end
+
 
     end
 
@@ -158,14 +166,99 @@ end
 
 
 
+--------------------------------------------------
+-- HITUNG TOOL DI CHARACTER
+--------------------------------------------------
+
+local function CountEquipped()
+
+
+    local Count = 0
+
+    local Character = LocalPlayer.Character
+
+
+    if Character then
+
+
+        for _, Tool in ipairs(Character:GetChildren()) do
+
+
+            if Tool:IsA("Tool")
+            and IsTarget(Tool.Name) then
+
+                Count += 1
+
+            end
+
+
+        end
+
+
+    end
+
+
+    return Count
+
+end
+
+
 
 --------------------------------------------------
--- FIND ALL TOOL
+-- WAIT SEMUA TOOL EQUIP
 --------------------------------------------------
 
-local function GetEquippedTools()
+local function WaitAllEquipped(Expected)
+
+
+    local Start = tick()
+
+
+    repeat
+
+
+        task.wait(0.1)
+
+
+        local Count = CountEquipped()
+
+
+        print(
+            "Equipped:",
+            Count,
+            "/",
+            Expected
+        )
+
+
+
+        if Count >= Expected then
+
+            return true
+
+        end
+
+
+
+    until tick() - Start > EQUIP_TIMEOUT
+
+
+
+    return false
+
+end
+
+
+
+--------------------------------------------------
+-- GET SEMUA TOOL
+--------------------------------------------------
+
+local function GetTools()
+
 
     local Result = {}
+
 
     local Character = LocalPlayer.Character
 
@@ -188,6 +281,7 @@ local function GetEquippedTools()
 
         end
 
+
     end
 
 
@@ -198,9 +292,8 @@ end
 
 
 
-
 --------------------------------------------------
--- CHECK DROP SUCCESS
+-- CHECK DROP SUKSES
 --------------------------------------------------
 
 local function IsDropped(Id)
@@ -245,9 +338,8 @@ end
 
 
 
-
 --------------------------------------------------
--- DROP ONE + WAIT SUCCESS
+-- DROP 1 ITEM + WAIT
 --------------------------------------------------
 
 local function DropAndWait(Tool)
@@ -270,7 +362,7 @@ local function DropAndWait(Tool)
 
 
     print(
-        "Drop request:",
+        "DROP:",
         Tool.Name,
         Id
     )
@@ -298,7 +390,6 @@ local function DropAndWait(Tool)
 
 
 
-
     if IsDropped(Id) then
 
         print(
@@ -309,7 +400,7 @@ local function DropAndWait(Tool)
     else
 
         warn(
-            "DROP TIMEOUT:",
+            "DROP GAGAL:",
             Tool.Name
         )
 
@@ -317,7 +408,6 @@ local function DropAndWait(Tool)
 
 
 end
-
 
 
 
@@ -330,7 +420,7 @@ while task.wait(SCAN_DELAY) do
 
 
     --------------------------------------------------
-    -- 1. SCAN SEMUA
+    -- 1. SCAN
     --------------------------------------------------
 
     local Items = ScanTargets()
@@ -354,42 +444,47 @@ while task.wait(SCAN_DELAY) do
 
 
 
-    task.wait(EQUIP_WAIT)
-
-
-
-
     --------------------------------------------------
-    -- 3. AMBIL TOOL
+    -- 3. TUNGGU SEMUA TOOL
     --------------------------------------------------
 
-    local Tools = GetEquippedTools()
+    if WaitAllEquipped(#Items) then
 
 
 
-    print(
-        "Tool siap drop:",
-        #Tools
-    )
+        --------------------------------------------------
+        -- 4. DROP SATU-SATU
+        --------------------------------------------------
+
+        local Tools = GetTools()
 
 
 
-
-    --------------------------------------------------
-    -- 4. DROP SATU-SATU
-    --------------------------------------------------
-
-    for _, Tool in ipairs(Tools) do
+        print(
+            "TOTAL DROP:",
+            #Tools
+        )
 
 
-        if Tool.Parent then
 
-            DropAndWait(Tool)
+        for _, Tool in ipairs(Tools) do
 
-            task.wait(0.3)
+
+            if Tool.Parent then
+
+                DropAndWait(Tool)
+
+                task.wait(0.3)
+
+            end
+
 
         end
 
+
+    else
+
+        warn("Tidak semua item berhasil equip")
 
     end
 
