@@ -1,0 +1,128 @@
+--DROP FRUIT PROJECT
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local TARGET = "Moon Bloom"
+local DELAY = 0.1
+
+--------------------------------------------------
+-- FUNCTION EQUIP MOON BLOOM
+--------------------------------------------------
+
+local function EquipMoonBloom()
+
+    local GridFrame = LocalPlayer.PlayerGui.BackpackGui.Backpack.Inventory.ScrollingFrame.UIGridFrame
+
+    for _, Button in ipairs(GridFrame:GetChildren()) do
+        if Button:IsA("TextButton") then
+
+            local ToolName = Button:FindFirstChild("ToolName")
+
+            if ToolName and ToolName.ContentText == TARGET then
+
+                print("Equip:", TARGET)
+
+                if firesignal then
+                    firesignal(Button.MouseButton1Click)
+                else
+                    for _, conn in ipairs(getconnections(Button.MouseButton1Click)) do
+                        conn:Fire()
+                    end
+                end
+
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+
+--------------------------------------------------
+-- FUNCTION FIND TOOL
+--------------------------------------------------
+
+local function FindTool()
+
+    local Character = LocalPlayer.Character
+
+    if Character then
+        for _, Tool in ipairs(Character:GetChildren()) do
+            if Tool:IsA("Tool") 
+            and Tool.Name:sub(1, #TARGET) == TARGET then
+                return Tool
+            end
+        end
+    end
+
+
+    local Backpack = LocalPlayer.Backpack
+
+    for _, Tool in ipairs(Backpack:GetChildren()) do
+        if Tool:IsA("Tool")
+        and Tool.Name:sub(1, #TARGET) == TARGET then
+            return Tool
+        end
+    end
+
+    return nil
+end
+
+
+--------------------------------------------------
+-- LOOP
+--------------------------------------------------
+
+while task.wait(DELAY) do
+
+    local Tool = FindTool()
+
+
+    -- jika belum equip, klik GUI
+    if not Tool then
+
+        local Success = EquipMoonBloom()
+
+        if Success then
+            print("Menunggu Tool...")
+        end
+
+        task.wait(0.2)
+
+        Tool = FindTool()
+    end
+
+
+    --------------------------------------------------
+    -- DROP
+    --------------------------------------------------
+
+    if Tool then
+
+        local Id = Tool:GetAttribute("Id")
+
+        if Id then
+
+            print("Drop:", Tool.Name, Id)
+
+            Networking.DroppedItem.RequestDrop:Fire(
+                "HarvestedFruits",
+                Id
+            )
+
+            task.wait(0.2)
+
+        else
+            warn("Tool tidak punya Id:", Tool.Name)
+        end
+    end
+
+end
