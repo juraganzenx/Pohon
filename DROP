@@ -1,11 +1,10 @@
--- EQUIP ALL -> WAIT ALL TOOL -> DROP QUEUE SYSTEM V22
+-- DROP JIKA LAGI EQUIP (MULTI ITEM)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Networking = require(ReplicatedStorage.SharedModules.Networking)
-
 
 --------------------------------------------------
 -- CONFIG
@@ -16,478 +15,85 @@ local TARGETS = {
     "Star Fruit"
 }
 
-local SCAN_DELAY = 1
-local EQUIP_DELAY = 0.1
-local EQUIP_TIMEOUT = 10
-
-local DROP_CHECK_DELAY = 0.2
-local DROP_TIMEOUT = 5
-
+local DELAY = 0.2
 
 
 --------------------------------------------------
--- TARGET CHECK
+-- CHECK TARGET
 --------------------------------------------------
 
 local function IsTarget(Name)
 
     for _, Target in ipairs(TARGETS) do
 
-        if Name == Target
-        or Name:sub(1, #Target) == Target then
-
+        if Name:sub(1, #Target) == Target then
             return true
-
         end
 
     end
 
     return false
-
 end
 
 
-
 --------------------------------------------------
--- CLICK BUTTON
---------------------------------------------------
-
-local function ClickButton(Button)
-
-    if firesignal then
-
-        firesignal(Button.MouseButton1Click)
-
-    else
-
-        for _, conn in ipairs(getconnections(Button.MouseButton1Click)) do
-            conn:Fire()
-        end
-
-    end
-
-end
-
-
-
---------------------------------------------------
--- SCAN SEMUA ITEM DI UI
+-- FIND EQUIPPED TOOL
 --------------------------------------------------
 
-local function ScanTargets()
-
-    local Result = {}
-
-
-    local BackpackGui =
-        LocalPlayer.PlayerGui:FindFirstChild("BackpackGui")
-
-
-    if not BackpackGui then
-        return Result
-    end
-
-
-
-    local GridFrame =
-        BackpackGui.Backpack.Inventory.ScrollingFrame.UIGridFrame
-
-
-
-    for _, Button in ipairs(GridFrame:GetChildren()) do
-
-
-        if Button:IsA("TextButton") then
-
-
-            local ToolName =
-                Button:FindFirstChild("ToolName")
-
-
-
-            if ToolName
-            and IsTarget(ToolName.ContentText) then
-
-
-                table.insert(Result, {
-                    Button = Button,
-                    Name = ToolName.ContentText
-                })
-
-
-            end
-
-
-        end
-
-
-    end
-
-
-
-    print("SCAN:", #Result)
-
-
-    return Result
-
-end
-
-
-
---------------------------------------------------
--- EQUIP SEMUA
---------------------------------------------------
-
-local function EquipAll(List)
-
-
-    for _, Data in ipairs(List) do
-
-
-        if Data.Button
-        and Data.Button.Parent then
-
-
-            print("EQUIP:", Data.Name)
-
-
-            ClickButton(Data.Button)
-
-
-            task.wait(EQUIP_DELAY)
-
-        end
-
-
-    end
-
-
-end
-
-
-
---------------------------------------------------
--- HITUNG TOOL DI CHARACTER
---------------------------------------------------
-
-local function CountEquipped()
-
-
-    local Count = 0
+local function FindEquippedTool()
 
     local Character = LocalPlayer.Character
-
-
-    if Character then
-
-
-        for _, Tool in ipairs(Character:GetChildren()) do
-
-
-            if Tool:IsA("Tool")
-            and IsTarget(Tool.Name) then
-
-                Count += 1
-
-            end
-
-
-        end
-
-
-    end
-
-
-    return Count
-
-end
-
-
-
---------------------------------------------------
--- WAIT SEMUA TOOL EQUIP
---------------------------------------------------
-
-local function WaitAllEquipped(Expected)
-
-
-    local Start = tick()
-
-
-    repeat
-
-
-        task.wait(0.1)
-
-
-        local Count = CountEquipped()
-
-
-        print(
-            "Equipped:",
-            Count,
-            "/",
-            Expected
-        )
-
-
-
-        if Count >= Expected then
-
-            return true
-
-        end
-
-
-
-    until tick() - Start > EQUIP_TIMEOUT
-
-
-
-    return false
-
-end
-
-
-
---------------------------------------------------
--- GET SEMUA TOOL
---------------------------------------------------
-
-local function GetTools()
-
-
-    local Result = {}
-
-
-    local Character = LocalPlayer.Character
-
 
     if not Character then
-        return Result
+        return nil
     end
-
 
 
     for _, Tool in ipairs(Character:GetChildren()) do
 
-
         if Tool:IsA("Tool")
         and IsTarget(Tool.Name) then
 
-
-            table.insert(Result, Tool)
-
+            return Tool
 
         end
-
-
     end
 
 
-
-    return Result
-
+    return nil
 end
 
 
-
 --------------------------------------------------
--- CHECK DROP SUKSES
+-- LOOP
 --------------------------------------------------
 
-local function IsDropped(Id)
+while task.wait(DELAY) do
+
+    local Tool = FindEquippedTool()
 
 
-    local Character = LocalPlayer.Character
-    local Backpack = LocalPlayer.Backpack
+    if Tool then
+
+        local Id = Tool:GetAttribute("Id")
 
 
+        if Id then
 
-    if Character then
+            print("Drop:", Tool.Name, Id)
 
-        for _, Item in ipairs(Character:GetChildren()) do
 
-            if Item:GetAttribute("Id") == Id then
+            Networking.DroppedItem.RequestDrop:Fire(
+                "HarvestedFruits",
+                Id
+            )
 
-                return false
 
-            end
+        else
+
+            warn("Tool tidak punya Id:", Tool.Name)
 
         end
-
     end
-
-
-
-    for _, Item in ipairs(Backpack:GetChildren()) do
-
-        if Item:GetAttribute("Id") == Id then
-
-            return false
-
-        end
-
-    end
-
-
-
-    return true
-
-end
-
-
-
---------------------------------------------------
--- DROP 1 ITEM + WAIT
---------------------------------------------------
-
-local function DropAndWait(Tool)
-
-
-    local Id = Tool:GetAttribute("Id")
-
-
-    if not Id then
-
-        warn(
-            "Tidak ada Id:",
-            Tool.Name
-        )
-
-        return
-
-    end
-
-
-
-    print(
-        "DROP:",
-        Tool.Name,
-        Id
-    )
-
-
-
-    Networking.DroppedItem.RequestDrop:Fire(
-        "HarvestedFruits",
-        Id
-    )
-
-
-
-    local Start = tick()
-
-
-
-    repeat
-
-        task.wait(DROP_CHECK_DELAY)
-
-
-    until IsDropped(Id)
-    or tick() - Start > DROP_TIMEOUT
-
-
-
-    if IsDropped(Id) then
-
-        print(
-            "DROP SUKSES:",
-            Tool.Name
-        )
-
-    else
-
-        warn(
-            "DROP GAGAL:",
-            Tool.Name
-        )
-
-    end
-
-
-end
-
-
-
---------------------------------------------------
--- MAIN LOOP
---------------------------------------------------
-
-while task.wait(SCAN_DELAY) do
-
-
-
-    --------------------------------------------------
-    -- 1. SCAN
-    --------------------------------------------------
-
-    local Items = ScanTargets()
-
-
-
-    if #Items == 0 then
-
-        continue
-
-    end
-
-
-
-
-    --------------------------------------------------
-    -- 2. EQUIP SEMUA
-    --------------------------------------------------
-
-    EquipAll(Items)
-
-
-
-    --------------------------------------------------
-    -- 3. TUNGGU SEMUA TOOL
-    --------------------------------------------------
-
-    if WaitAllEquipped(#Items) then
-
-
-
-        --------------------------------------------------
-        -- 4. DROP SATU-SATU
-        --------------------------------------------------
-
-        local Tools = GetTools()
-
-
-
-        print(
-            "TOTAL DROP:",
-            #Tools
-        )
-
-
-
-        for _, Tool in ipairs(Tools) do
-
-
-            if Tool.Parent then
-
-                DropAndWait(Tool)
-
-                task.wait(0.3)
-
-            end
-
-
-        end
-
-
-    else
-
-        warn("Tidak semua item berhasil equip")
-
-    end
-
-
 
 end
