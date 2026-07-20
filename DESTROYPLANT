@@ -1,14 +1,18 @@
---DESTROY FRUIT AND PLANT PROJECTS
+--DESTROY FRUIT AND PLANT PROJECT
 local Gardens = workspace:WaitForChild("Gardens")
+local DroppedItems = workspace:WaitForChild("DroppedItems")
 
 while true do
+
+    -- DESTROY PLANTS / FRUITS
     for _, Plot in ipairs(Gardens:GetChildren()) do
         local Plants = Plot:FindFirstChild("Plants")
 
         if Plants then
             for _, Plant in ipairs(Plants:GetChildren()) do
+
                 -- Destroy Part/MeshPart pada Plant
-                -- kecuali yang berada di Fruits dan FruitSpawnLocations
+                -- kecuali Fruits dan FruitSpawnLocations
                 for _, Obj in ipairs(Plant:GetDescendants()) do
                     if (Obj:IsA("Part") or Obj:IsA("MeshPart"))
                         and not Obj:FindFirstAncestor("Fruits")
@@ -33,6 +37,19 @@ while true do
             end
         end
     end
+
+
+    -- DESTROY DROPPED ITEMS VISUAL
+    for _, Item in ipairs(DroppedItems:GetChildren()) do
+        
+        local Visual = Item:FindFirstChild("Visual")
+
+        if Visual and Visual:IsA("Model") then
+            Visual:Destroy()
+        end
+
+    end
+
 
     task.wait(1)
 end
