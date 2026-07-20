@@ -1,0 +1,201 @@
+--AUTOPLANT MOONBLOOM
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+local SEED_NAME = "Moon Bloom"
+local MAX_GOLD = 300
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GoldCounterGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.fromOffset(180, 40)
+Frame.Position = UDim2.new(1, -190, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.fromScale(1, 1)
+Label.BackgroundTransparency = 1
+Label.Font = Enum.Font.GothamBold
+Label.TextScaled = true
+Label.TextColor3 = Color3.new(1, 1, 1)
+Label.Text = "Gold: 0/300"
+Label.Parent = Frame
+
+--------------------------------------------------
+-- FUNCTIONS
+--------------------------------------------------
+
+local function GetMyPlot()
+    local PlotId = LocalPlayer:GetAttribute("PlotId")
+    if not PlotId then
+        return nil
+    end
+
+    return workspace.Gardens:FindFirstChild("Plot" .. PlotId)
+end
+
+local function CountGoldPlants()
+    local Plot = GetMyPlot()
+    if not Plot then
+        Label.Text = "Gold: 0/" .. MAX_GOLD
+        return 0
+    end
+
+    local Plants = Plot:FindFirstChild("Plants")
+    if not Plants then
+        Label.Text = "Gold: 0/" .. MAX_GOLD
+        return 0
+    end
+
+    local Count = 0
+
+    for _, Plant in ipairs(Plants:GetChildren()) do
+        if Plant:GetAttribute("Mutation") == "Gold" then
+            Count += 1
+        end
+    end
+
+    Label.Text = ("Gold: %d/%d"):format(Count, MAX_GOLD)
+
+    if Count >= MAX_GOLD then
+        Label.TextColor3 = Color3.fromRGB(255, 80, 80)
+    else
+        Label.TextColor3 = Color3.fromRGB(80, 255, 80)
+    end
+
+    return Count
+end
+
+--------------------------------------------------
+-- WAIT LOAD
+--------------------------------------------------
+
+repeat
+    task.wait()
+until GetMyPlot()
+
+local Plot = GetMyPlot()
+
+Plot:WaitForChild("Visual")
+Plot.Visual:WaitForChild("FRONT_BedSection")
+
+local BottomFace = Plot.Visual.FRONT_BedSection:WaitForChild("BottomFace")
+--------------------------------------------------
+-- RANDOM PLANT POSITION
+--------------------------------------------------
+
+local RADIUS = 4          -- Radius area tanam
+local MAX_HEIGHT = 3      -- Tinggi maksimal
+local MIN_DISTANCE = 0.1  -- Jarak minimal antar titik
+local MAX_ATTEMPTS = 10000
+
+local UsedPositions = {}
+
+local function GetNextPlantPosition()
+
+    for _ = 1, MAX_ATTEMPTS do
+
+        local angle = math.random() * math.pi * 2
+        local radius = math.sqrt(math.random()) * RADIUS
+        local height = math.random() * MAX_HEIGHT
+
+        local localPos = Vector3.new(
+            math.cos(angle) * radius,
+            height,
+            math.sin(angle) * radius
+        )
+
+        local worldPos = BottomFace.CFrame:PointToWorldSpace(localPos)
+
+        local valid = true
+
+        for _, pos in ipairs(UsedPositions) do
+            if (pos - worldPos).Magnitude < MIN_DISTANCE then
+                valid = false
+                break
+            end
+        end
+
+        if valid then
+            table.insert(UsedPositions, worldPos)
+
+            -- Hindari tabel menjadi terlalu besar
+            if #UsedPositions > 1000 then
+                table.remove(UsedPositions, 1)
+            end
+
+            return worldPos
+        end
+    end
+
+    -- Fallback jika gagal menemukan posisi yang cukup jauh
+    return BottomFace.Position + Vector3.new(
+        (math.random() * 2 - 1) * RADIUS,
+        math.random() * MAX_HEIGHT,
+        (math.random() * 2 - 1) * RADIUS
+    )
+end
+
+--------------------------------------------------
+-- AUTO PLANT
+--------------------------------------------------
+
+while task.wait(0.1) do
+
+    local GoldCount = CountGoldPlants()
+
+    if GoldCount >= MAX_GOLD then
+        continue
+    end
+
+    local Character = LocalPlayer.Character
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+
+    if not Character or not Backpack then
+        continue
+    end
+
+    -- Cari Gold Seed
+    local Tool = Character:FindFirstChild(SEED_NAME)
+
+    if not Tool then
+        Tool = Backpack:FindFirstChild(SEED_NAME)
+
+        if Tool and Tool:IsA("Tool") then
+            Tool.Parent = Character
+            task.wait(0.2)
+        end
+    end
+
+    if not Tool then
+        continue
+    end
+
+    local SeedTool = Tool:GetAttribute("SeedTool")
+    if not SeedTool then
+        continue
+    end
+
+    local PlantPos = GetNextPlantPosition()
+
+    Networking.Plant.PlantSeed:Fire(
+        PlantPos,
+        SeedTool,
+        Tool
+    )
+end
