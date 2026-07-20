@@ -32,7 +32,7 @@ while task.wait(CHECK_DELAY) do
     end
 
     if tick() - lastChange >= TIME_LIMIT then
-        LocalPlayer:Kick("Backpack tidak berubah selama 1 menit.")
+        LocalPlayer:Kick("Backpack tidak berubah selama 2 menit.")
         break
     end
 end
