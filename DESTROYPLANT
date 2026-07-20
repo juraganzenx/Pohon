@@ -11,7 +11,7 @@ while true do
                 -- kecuali yang berada di Fruits dan FruitSpawnLocations
                 for _, Obj in ipairs(Plant:GetDescendants()) do
                     if (Obj:IsA("Part") or Obj:IsA("MeshPart"))
-                        and not Obj:FindFirstAncestor("Fruits")
+                        and not Obj:FindFirstAncestor("Fruits")
                         and not Obj:FindFirstAncestor("FruitSpawnLocations") then
                         Obj:Destroy()
                     end
