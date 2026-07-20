@@ -1,0 +1,540 @@
+-- SPRINKLER + SUPER WATERING PROJECT
+-- MOON BLOOM PAUSE VERSION
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local CONFIG = {
+
+    CHECK_DELAY = 2,
+
+    AFTER_SPRINKLER_DELAY = 1,
+
+    AFTER_WATER_DELAY = 3,
+
+    WATERING_CAN = "Super Watering Can",
+
+    SPRINKLERS = {
+
+        "Common Sprinkler",
+        "Uncommon Sprinkler",
+        "Rare Sprinkler",
+        "Legendary Sprinkler",
+        "Super Sprinkler",
+
+    },
+
+
+    SPRINKLER_OFFSETS = {
+
+        ["Common Sprinkler"] =
+            Vector3.new(2.5,3,0),
+
+        ["Uncommon Sprinkler"] =
+            Vector3.new(0.8,3,2.4),
+
+        ["Rare Sprinkler"] =
+            Vector3.new(-2,3,1.5),
+
+        ["Legendary Sprinkler"] =
+            Vector3.new(-2,3,-1.5),
+
+        ["Super Sprinkler"] =
+            Vector3.new(0.8,3,-2.4),
+
+    }
+
+}
+
+
+
+--------------------------------------------------
+-- CHECK MOON BLOOM
+--------------------------------------------------
+
+local function HasMoonBloom()
+
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+
+
+    if Backpack then
+
+        for _,Item in ipairs(Backpack:GetChildren()) do
+
+            if string.find(Item.Name, "Moon Bloom") then
+
+                return true
+
+            end
+
+        end
+
+    end
+
+
+
+    local Character = LocalPlayer.Character
+
+
+    if Character then
+
+        for _,Item in ipairs(Character:GetChildren()) do
+
+            if Item:IsA("Tool")
+            and string.find(Item.Name, "Moon Bloom") then
+
+                return true
+
+            end
+
+        end
+
+    end
+
+
+    return false
+
+end
+
+
+
+--------------------------------------------------
+-- GET PLOT
+--------------------------------------------------
+
+local function GetPlot()
+
+    local PlotId =
+        LocalPlayer:GetAttribute("PlotId")
+
+
+    if not PlotId then
+        return nil,nil
+    end
+
+
+    return workspace.Gardens:FindFirstChild("Plot"..PlotId), PlotId
+
+end
+
+
+
+--------------------------------------------------
+-- UNEQUIP
+--------------------------------------------------
+
+local function UnequipTools()
+
+    local Character = LocalPlayer.Character
+
+    if not Character then
+        return
+    end
+
+
+    local Humanoid =
+        Character:FindFirstChildOfClass("Humanoid")
+
+
+    if Humanoid then
+        Humanoid:UnequipTools()
+    end
+
+end
+
+
+
+--------------------------------------------------
+-- EQUIP SPRINKLER
+--------------------------------------------------
+
+local function EquipSprinkler(Name)
+
+    local Character =
+        LocalPlayer.Character
+        or LocalPlayer.CharacterAdded:Wait()
+
+
+    local Backpack =
+        LocalPlayer:WaitForChild("Backpack")
+
+
+
+    for _,Tool in ipairs(Character:GetChildren()) do
+
+        if Tool:IsA("Tool")
+        and Tool:GetAttribute("Sprinkler") == Name then
+
+            return Tool
+
+        end
+
+    end
+
+
+
+    for _,Tool in ipairs(Backpack:GetChildren()) do
+
+        if Tool:IsA("Tool")
+        and Tool:GetAttribute("Sprinkler") == Name then
+
+
+            local Humanoid =
+                Character:FindFirstChildOfClass("Humanoid")
+
+
+            if Humanoid then
+
+                Humanoid:EquipTool(Tool)
+
+                task.wait(.35)
+
+            end
+
+
+            return Tool
+
+        end
+
+    end
+
+
+    return nil
+
+end
+
+
+
+--------------------------------------------------
+-- EQUIP WATER CAN
+--------------------------------------------------
+
+local function EquipWateringCan()
+
+    local Character =
+        LocalPlayer.Character
+        or LocalPlayer.CharacterAdded:Wait()
+
+
+    local Backpack =
+        LocalPlayer:WaitForChild("Backpack")
+
+
+
+    local Tool =
+        Character:FindFirstChild(CONFIG.WATERING_CAN)
+
+
+    if Tool then
+        return Tool
+    end
+
+
+
+    Tool =
+        Backpack:FindFirstChild(CONFIG.WATERING_CAN)
+
+
+    if Tool then
+
+        local Humanoid =
+            Character:FindFirstChildOfClass("Humanoid")
+
+
+        if Humanoid then
+
+            Humanoid:EquipTool(Tool)
+
+            task.wait(.35)
+
+        end
+
+
+        return Tool
+
+    end
+
+
+    return nil
+
+end
+
+
+
+--------------------------------------------------
+-- SPRINKLER CHECK
+--------------------------------------------------
+
+local function HasSprinkler(Folder,Name)
+
+    for _,Obj in ipairs(Folder:GetChildren()) do
+
+        if Obj:GetAttribute("SprinklerName") == Name then
+
+            return true
+
+        end
+
+    end
+
+
+    return false
+
+end
+
+
+
+--------------------------------------------------
+-- POSITION
+--------------------------------------------------
+
+local function GetFrontBedPosition(Plot)
+
+    local Visual =
+        Plot:FindFirstChild("Visual")
+
+
+    if not Visual then
+        return nil
+    end
+
+
+
+    local Bed =
+        Visual:FindFirstChild("FRONT_BedSection")
+
+
+    if Bed then
+
+        local BottomFace =
+            Bed:FindFirstChild("BottomFace")
+
+
+        if BottomFace then
+
+            return BottomFace.Position
+
+        end
+
+    end
+
+
+    return nil
+
+end
+
+
+
+--------------------------------------------------
+-- PLACE SPRINKLER
+--------------------------------------------------
+
+local function PlaceSprinklers()
+
+    local Plot,PlotId =
+        GetPlot()
+
+
+    if not Plot then
+        return
+    end
+
+
+
+    local Folder =
+        Plot:FindFirstChild("Sprinklers")
+
+
+    if not Folder then
+        return
+    end
+
+
+
+    local Base =
+        GetFrontBedPosition(Plot)
+
+
+    if not Base then
+        return
+    end
+
+
+
+    for _,Name in ipairs(CONFIG.SPRINKLERS) do
+
+
+        if not HasSprinkler(Folder,Name) then
+
+
+            local Tool =
+                EquipSprinkler(Name)
+
+
+
+            if Tool then
+
+
+                Networking.Place.PlaceSprinkler:Fire(
+
+                    Base +
+                    (
+                        CONFIG.SPRINKLER_OFFSETS[Name]
+                        or Vector3.new(0,3,0)
+                    ),
+
+                    Name,
+
+                    Tool,
+
+                    PlotId
+
+                )
+
+
+                print("[SPRINKLER]",Name,"PLACED")
+
+
+                task.wait(.5)
+
+            end
+
+        end
+
+    end
+
+
+    UnequipTools()
+
+end
+
+
+
+--------------------------------------------------
+-- WATERING CAN
+--------------------------------------------------
+
+local function UseWateringCan()
+
+    local Plot =
+        GetPlot()
+
+
+    if not Plot then
+        return
+    end
+
+
+
+    local Tool =
+        EquipWateringCan()
+
+
+
+    if not Tool then
+        return
+    end
+
+
+
+    local Position =
+        GetFrontBedPosition(Plot)
+
+
+
+    if Position then
+
+
+        Networking.WateringCan.UseWateringCan:Fire(
+
+            Position + Vector3.new(0,3,0),
+
+            CONFIG.WATERING_CAN,
+
+            Tool
+
+        )
+
+
+        print("[WATER] USED")
+
+    end
+
+
+
+    task.wait(.2)
+
+    UnequipTools()
+
+end
+
+
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+while task.wait(CONFIG.CHECK_DELAY) do
+
+
+    --------------------------------------------------
+    -- PAUSE IF MOON BLOOM EXISTS
+    --------------------------------------------------
+
+    if HasMoonBloom() then
+
+
+        print("[PAUSE] Moon Bloom ditemukan")
+
+
+        repeat
+
+            task.wait(2)
+
+        until not HasMoonBloom()
+
+
+
+        print("[RESUME] Moon Bloom hilang")
+
+
+    end
+
+
+
+    print("[ACTION] SPRINKLER + WATER")
+
+
+
+    pcall(function()
+
+        PlaceSprinklers()
+
+    end)
+
+
+
+    task.wait(CONFIG.AFTER_SPRINKLER_DELAY)
+
+
+
+    pcall(function()
+
+        UseWateringCan()
+
+    end)
+
+
+
+    task.wait(CONFIG.AFTER_WATER_DELAY)
+
+
+end
