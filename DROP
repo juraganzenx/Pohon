@@ -17,10 +17,10 @@ local TARGETS = {
 }
 
 local SCAN_DELAY = 1
-local EQUIP_DELAY = 0.5
+local EQUIP_DELAY = 0.1
 local EQUIP_TIMEOUT = 10
 
-local DROP_CHECK_DELAY = 0.1
+local DROP_CHECK_DELAY = 0.2
 local DROP_TIMEOUT = 5
 
 
