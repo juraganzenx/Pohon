@@ -30,9 +30,9 @@ local function EquipMoonBloom()
                 print("Equip:", TARGET)
 
                 if firesignal then
-                    firesignal(Button.MouseButton1Click)
+                    firesignal(Button.Activated)
                 else
-                    for _, conn in ipairs(getconnections(Button.MouseButton1Click)) do
+                    for _, conn in ipairs(getconnections(Button.Activated)) do
                         conn:Fire()
                     end
                 end
