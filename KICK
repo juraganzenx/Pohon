@@ -1,0 +1,38 @@
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+
+local CHECK_DELAY = 1
+local TIME_LIMIT = 60 -- 1 menit
+
+local lastCount = 0
+local lastChange = tick()
+
+local function GetBackpackCount()
+    local count = 0
+
+    for _, item in ipairs(Backpack:GetChildren()) do
+        if item:IsA("Tool") or item:IsA("Configuration") then
+            count += 1
+        end
+    end
+
+    return count
+end
+
+lastCount = GetBackpackCount()
+
+while task.wait(CHECK_DELAY) do
+    local currentCount = GetBackpackCount()
+
+    if currentCount ~= lastCount then
+        lastCount = currentCount
+        lastChange = tick()
+    end
+
+    if tick() - lastChange >= TIME_LIMIT then
+        LocalPlayer:Kick("Backpack tidak berubah selama 1 menit.")
+        break
+    end
+end
