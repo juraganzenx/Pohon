@@ -1,0 +1,133 @@
+--HARVERS
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Gardens = workspace:WaitForChild("Gardens")
+
+-- Blacklist Fruit berdasarkan CorePartName
+local BLACKLIST = {
+    NAMEFRUIT = true,
+}
+
+-- Cari plot milik player
+local function GetMyPlot()
+    for i = 1, 8 do
+        local Plot = Gardens:FindFirstChild("Plot" .. i)
+
+        if Plot and Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            return Plot
+        end
+    end
+
+    return nil
+end
+
+while task.wait(0) do
+    local MyPlot = GetMyPlot()
+
+    if not MyPlot then
+        warn("❌ Plot milikmu tidak ditemukan!")
+        continue
+    end
+
+    local Plants = MyPlot:FindFirstChild("Plants")
+
+    if not Plants then
+        warn("❌ Folder Plants tidak ditemukan!")
+        continue
+    end
+
+    local harvested = 0
+
+    for _, Plant in ipairs(Plants:GetChildren()) do
+        ----------------------------------------------------------------
+        -- Harvest Plant
+        ----------------------------------------------------------------
+        local HarvestPart = Plant:FindFirstChild("HarvestPart")
+
+        if HarvestPart then
+            local HarvestPrompt = HarvestPart:FindFirstChild("HarvestPrompt")
+
+            if HarvestPrompt and HarvestPrompt:IsA("ProximityPrompt") then
+                pcall(function()
+                    fireproximityprompt(HarvestPrompt)
+                end)
+
+                harvested += 1
+                task.wait(0.001)
+            end
+        end
+
+        ----------------------------------------------------------------
+        -- Harvest Fruits (Prioritas Mutation)
+        ----------------------------------------------------------------
+        local Fruits = Plant:FindFirstChild("Fruits")
+
+        if Fruits then
+            -- PASS 1: Harvest buah yang punya Mutation dulu
+            for _, Fruit in ipairs(Fruits:GetChildren()) do
+                if not Fruit:GetAttribute("Mutation") then
+                    continue
+                end
+
+                local CorePartName = Fruit:GetAttribute("CorePartName")
+
+                if BLACKLIST[CorePartName] then
+                    print("⏭️ Skip Fruit:", Fruit.Name, "|", CorePartName)
+                    continue
+                end
+
+                local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
+
+                if FruitHarvestPart then
+                    local FruitPrompt = FruitHarvestPart:FindFirstChild("HarvestPrompt")
+
+                    if FruitPrompt and FruitPrompt:IsA("ProximityPrompt") then
+                        pcall(function()
+                            fireproximityprompt(FruitPrompt)
+                        end)
+
+                        harvested += 1
+                        task.wait(0.001)
+                    end
+                end
+            end
+
+            -- PASS 2: Harvest buah biasa
+            for _, Fruit in ipairs(Fruits:GetChildren()) do
+                if Fruit:GetAttribute("Mutation") then
+                    continue
+                end
+
+                local CorePartName = Fruit:GetAttribute("CorePartName")
+
+                if BLACKLIST[CorePartName] then
+                    print("⏭️ Skip Fruit:", Fruit.Name, "|", CorePartName)
+                    continue
+                end
+
+                local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
+
+                if FruitHarvestPart then
+                    local FruitPrompt = FruitHarvestPart:FindFirstChild("HarvestPrompt")
+
+                    if FruitPrompt and FruitPrompt:IsA("ProximityPrompt") then
+                        pcall(function()
+                            fireproximityprompt(FruitPrompt)
+                        end)
+
+                        harvested += 1
+                        task.wait(0.001)
+                    end
+                end
+            end
+        end
+    end
+
+    print(string.format(
+        "✅ [%s] Harvest selesai | Plants: %d | Total Harvest: %d",
+        MyPlot.Name,
+        #Plants:GetChildren(),
+        harvested
+    ))
+end
