@@ -1,1 +1,27 @@
 
+--// AUTO EXECUTE
+
+local BASE_URL = "https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/"
+
+local Scripts = {
+    "DESTROYPLANT",
+    "DROP",
+    "HARVEST",
+    "PLANT",
+    "SSDANSWC",
+    "TWEENTOFRONT"
+}
+
+for _, scriptName in ipairs(Scripts) do
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(BASE_URL .. scriptName, true))()
+    end)
+
+    if success then
+        print("[EXECUTED]", scriptName)
+    else
+        warn("[FAILED]", scriptName, err)
+    end
+
+    task.wait(0.2) -- jeda 0.2 detik
+end
