@@ -1,54 +1,77 @@
--- EQUIP ALL FRUIT LOOP
+-- EQUIP ALL ITEM LOOP
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-local TARGETS = {
-    "Moon Bloom",
-    "Star Fruit"
-}
-
 local DELAY = 1
 
-
-local function IsTarget(Name)
-
-    for _, Target in ipairs(TARGETS) do
-
-        if Name == Target then
-            return true
-        end
-
-    end
-
-    return false
-end
-
+--------------------------------------------------
+-- CLICK BUTTON
+--------------------------------------------------
 
 local function ClickButton(Button)
 
     if firesignal then
+
         firesignal(Button.MouseButton1Click)
+
     else
+
         for _, conn in ipairs(getconnections(Button.MouseButton1Click)) do
             conn:Fire()
         end
+
     end
 
 end
 
+--------------------------------------------------
+-- EQUIP ALL ITEM
+--------------------------------------------------
 
-local function EquipAllFruit()
+local function EquipAllItem()
 
-    local BackpackGui = LocalPlayer.PlayerGui:FindFirstChild("BackpackGui")
+    local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
+    if not PlayerGui then
+        return
+    end
+
+    local BackpackGui = PlayerGui:FindFirstChild("BackpackGui")
 
     if not BackpackGui then
         return
     end
 
-    local GridFrame = BackpackGui.Backpack.Inventory.ScrollingFrame.UIGridFrame
+    local Backpack = BackpackGui:FindFirstChild("Backpack")
+
+    if not Backpack then
+        return
+    end
+
+    local Inventory = Backpack:FindFirstChild("Inventory")
+
+    if not Inventory then
+        return
+    end
+
+    local ScrollingFrame = Inventory:FindFirstChild("ScrollingFrame")
+
+    if not ScrollingFrame then
+        return
+    end
+
+    local GridFrame = ScrollingFrame:FindFirstChild("UIGridFrame")
+
+    if not GridFrame then
+        return
+    end
 
     local Count = 0
+
+    --------------------------------------------------
+    -- SCAN SEMUA ITEM
+    --------------------------------------------------
 
     for _, Button in ipairs(GridFrame:GetChildren()) do
 
@@ -56,25 +79,37 @@ local function EquipAllFruit()
 
             local ToolName = Button:FindFirstChild("ToolName")
 
-            if ToolName and IsTarget(ToolName.ContentText) then
+            if ToolName then
 
                 Count += 1
 
-                print("Klik:", ToolName.ContentText, "#"..Count)
+                print(
+                    "Klik:",
+                    ToolName.ContentText,
+                    "#" .. Count
+                )
 
                 ClickButton(Button)
 
                 task.wait(0.5)
-            end
-        end
-    end
 
+            end
+
+        end
+
+    end
 
     if Count > 0 then
-        print("Total item diklik:", Count)
-    end
-end
 
+        print("Total item diklik:", Count)
+
+    else
+
+        print("Tidak ada item.")
+
+    end
+
+end
 
 --------------------------------------------------
 -- LOOP
@@ -82,6 +117,6 @@ end
 
 while task.wait(DELAY) do
 
-    EquipAllFruit()
+    EquipAllItem()
 
 end
