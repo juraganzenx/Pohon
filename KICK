@@ -1,10 +1,11 @@
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 
 local LocalPlayer = Players.LocalPlayer
 local Backpack = LocalPlayer:WaitForChild("Backpack")
 
 local CHECK_DELAY = 1
-local TIME_LIMIT = 120 -- 1 menit
+local TIME_LIMIT = 120 -- 2 menit
 
 local lastCount = 0
 local lastChange = tick()
@@ -32,7 +33,11 @@ while task.wait(CHECK_DELAY) do
     end
 
     if tick() - lastChange >= TIME_LIMIT then
-        LocalPlayer:Kick("Backpack tidak berubah selama 2 menit.")
+        TeleportService:TeleportToPlaceInstance(
+            game.PlaceId,
+            game.JobId,
+            LocalPlayer
+        )
         break
     end
 end
