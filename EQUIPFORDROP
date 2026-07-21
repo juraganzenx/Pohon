@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local DELAY = 1
+local AFTER_CLICK_DELAY = 0.5
 
 --------------------------------------------------
 -- CLICK BUTTON
@@ -21,6 +22,26 @@ local function ClickButton(Button)
             conn:Fire()
         end
 
+    end
+
+end
+
+--------------------------------------------------
+-- UNEQUIP ALL
+--------------------------------------------------
+
+local function UnequipAll()
+
+    local Character = LocalPlayer.Character
+
+    if not Character then
+        return
+    end
+
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+
+    if Humanoid then
+        Humanoid:UnequipTools()
     end
 
 end
@@ -67,10 +88,8 @@ local function EquipAllItem()
         return
     end
 
-    local Count = 0
-
     --------------------------------------------------
-    -- SCAN SEMUA ITEM
+    -- KLIK SEMUA ITEM
     --------------------------------------------------
 
     for _, Button in ipairs(GridFrame:GetChildren()) do
@@ -81,13 +100,7 @@ local function EquipAllItem()
 
             if ToolName then
 
-                Count += 1
-
-                print(
-                    "Klik:",
-                    ToolName.ContentText,
-                    "#" .. Count
-                )
+                print("Klik:", ToolName.ContentText)
 
                 ClickButton(Button)
 
@@ -99,15 +112,17 @@ local function EquipAllItem()
 
     end
 
-    if Count > 0 then
+    --------------------------------------------------
+    -- TUNGGU SETELAH SEMUA DIKLIK
+    --------------------------------------------------
 
-        print("Total item diklik:", Count)
+    task.wait(AFTER_CLICK_DELAY)
 
-    else
+    --------------------------------------------------
+    -- UNEQUIP SEMUA
+    --------------------------------------------------
 
-        print("Tidak ada item.")
-
-    end
+    UnequipAll()
 
 end
 
