@@ -1,23 +1,23 @@
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
-task.wait(60)
+while task.wait(60) do
+    VirtualInputManager:SendMouseButtonEvent(
+        500,
+        300,
+        0,
+        true,
+        game,
+        0
+    )
 
-VirtualInputManager:SendMouseButtonEvent(
-    500, -- X
-    300, -- Y
-    0,   -- Left Mouse Button
-    true,
-    game,
-    0
-)
+    task.wait(0.05)
 
-task.wait(0.05)
-
-VirtualInputManager:SendMouseButtonEvent(
-    500,
-    300,
-    0,
-    false,
-    game,
-    0
-)
+    VirtualInputManager:SendMouseButtonEvent(
+        500,
+        300,
+        0,
+        false,
+        game,
+        0
+    )
+end
