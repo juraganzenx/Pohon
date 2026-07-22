@@ -1,43 +1,53 @@
 local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
 
 local LocalPlayer = Players.LocalPlayer
-local Backpack = LocalPlayer:WaitForChild("Backpack")
 
-local CHECK_DELAY = 1
-local TIME_LIMIT = 120 -- 2 menit
+local MAX_SHECKLES = 1000000000 -- 1 Billion
 
-local lastCount = 0
-local lastChange = tick()
+--------------------------------------------------
+-- Cek apakah ada player dengan Sheckles < 1B
+--------------------------------------------------
+local function HasPlayerUnder1B()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local leaderstats = player:FindFirstChild("leaderstats")
 
-local function GetBackpackCount()
-    local count = 0
+		if leaderstats then
+			local sheckles = leaderstats:FindFirstChild("Sheckles")
 
-    for _, item in ipairs(Backpack:GetChildren()) do
-        if item:IsA("Tool") or item:IsA("Configuration") then
-            count += 1
-        end
-    end
+			if sheckles and sheckles:IsA("IntValue") then
+				print(
+					player.Name
+					.. " memiliki "
+					.. sheckles.Value
+					.. " Sheckles."
+				)
 
-    return count
+				-- Jika ditemukan player dengan Sheckles < 1B
+				if sheckles.Value < MAX_SHECKLES then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
 end
 
-lastCount = GetBackpackCount()
+--------------------------------------------------
+-- Main Loop
+--------------------------------------------------
+while true do
+	if not HasPlayerUnder1B() then
+		warn("Tidak ada player dengan Sheckles di bawah 1B. Kick!")
 
-while task.wait(CHECK_DELAY) do
-    local currentCount = GetBackpackCount()
+		LocalPlayer:Kick(
+			"Tidak ada player dengan Sheckles < 1B"
+		)
 
-    if currentCount ~= lastCount then
-        lastCount = currentCount
-        lastChange = tick()
-    end
+		break
+	end
 
-    if tick() - lastChange >= TIME_LIMIT then
-        TeleportService:TeleportToPlaceInstance(
-            game.PlaceId,
-            game.JobId,
-            LocalPlayer
-        )
-        break
-    end
+	warn("Masih ada player dengan Sheckles < 1B.")
+
+	task.wait(60)
 end
