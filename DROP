@@ -1,4 +1,21 @@
--- DROP JIKA LAGI EQUIP (MULTI ITEM)
+--==================================================
+-- EQUIP ALL VIA GUI
+-- ↓
+-- WAIT 0.5
+-- ↓
+-- SCAN MOON BLOOM + STAR FRUIT
+-- ↓
+-- MASUKKAN SEMUA KE BATCH
+-- ↓
+-- EQUIP LANGSUNG DARI BACKPACK
+-- ↓
+-- DROP SATU PER SATU
+-- ↓
+-- TUNGGU SEMUA BATCH SELESAI
+-- ↓
+-- ULANGI DARI AWAL
+--==================================================
+
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,16 +23,30 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Networking = require(ReplicatedStorage.SharedModules.Networking)
 
+
 --------------------------------------------------
 -- CONFIG
+--------------------------------------------------
+
+local DELAY = 1
+
+local GUI_CLICK_DELAY = 0.5
+
+local AFTER_GUI_DELAY = 0.5
+
+local EQUIP_WAIT = 0.2
+
+local DROP_WAIT = 0.5
+
+
+--------------------------------------------------
+-- TARGET
 --------------------------------------------------
 
 local TARGETS = {
     "Moon Bloom",
     "Star Fruit"
 }
-
-local DELAY = 0.2
 
 
 --------------------------------------------------
@@ -27,73 +58,682 @@ local function IsTarget(Name)
     for _, Target in ipairs(TARGETS) do
 
         if Name:sub(1, #Target) == Target then
+
             return true
+
         end
 
     end
 
     return false
+
 end
 
 
 --------------------------------------------------
--- FIND EQUIPPED TOOL
+-- CLICK BUTTON
 --------------------------------------------------
 
-local function FindEquippedTool()
+local function ClickButton(Button)
 
-    local Character = LocalPlayer.Character
+    if firesignal then
 
-    if not Character then
-        return nil
+        firesignal(
+            Button.MouseButton1Click
+        )
+
+    else
+
+        for _, Connection in ipairs(
+            getconnections(Button.MouseButton1Click)
+        ) do
+
+            Connection:Fire()
+
+        end
+
+    end
+
+end
+
+
+--------------------------------------------------
+-- EQUIP ALL ITEM VIA GUI
+--------------------------------------------------
+
+local function EquipAllItem()
+
+    local PlayerGui =
+        LocalPlayer:FindFirstChild("PlayerGui")
+
+    if not PlayerGui then
+
+        warn("PlayerGui tidak ditemukan")
+
+        return
+
     end
 
 
-    for _, Tool in ipairs(Character:GetChildren()) do
+    local BackpackGui =
+        PlayerGui:FindFirstChild("BackpackGui")
+
+    if not BackpackGui then
+
+        warn("BackpackGui tidak ditemukan")
+
+        return
+
+    end
+
+
+    local BackpackFrame =
+        BackpackGui:FindFirstChild("Backpack")
+
+    if not BackpackFrame then
+
+        warn("Backpack Frame tidak ditemukan")
+
+        return
+
+    end
+
+
+    local Inventory =
+        BackpackFrame:FindFirstChild("Inventory")
+
+    if not Inventory then
+
+        warn("Inventory tidak ditemukan")
+
+        return
+
+    end
+
+
+    local ScrollingFrame =
+        Inventory:FindFirstChild("ScrollingFrame")
+
+    if not ScrollingFrame then
+
+        warn("ScrollingFrame tidak ditemukan")
+
+        return
+
+    end
+
+
+    local GridFrame =
+        ScrollingFrame:FindFirstChild("UIGridFrame")
+
+    if not GridFrame then
+
+        warn("UIGridFrame tidak ditemukan")
+
+        return
+
+    end
+
+
+    --------------------------------------------------
+    -- SCAN SEMUA BUTTON
+    --------------------------------------------------
+
+    for _, Button in ipairs(
+        GridFrame:GetChildren()
+    ) do
+
+
+        if Button:IsA("TextButton") then
+
+
+            local ToolName =
+                Button:FindFirstChild("ToolName")
+
+
+            if ToolName then
+
+
+                print(
+                    "[GUI EQUIP]",
+                    ToolName.ContentText
+                )
+
+
+                ClickButton(Button)
+
+
+                task.wait(
+                    GUI_CLICK_DELAY
+                )
+
+
+            end
+
+
+        end
+
+    end
+
+end
+
+
+--------------------------------------------------
+-- CREATE TARGET BATCH
+--------------------------------------------------
+
+local function CreateTargetBatch()
+
+    local Batch = {}
+
+    local Backpack =
+        LocalPlayer:FindFirstChild("Backpack")
+
+
+    if not Backpack then
+
+        warn("Backpack tidak ditemukan")
+
+        return Batch
+
+    end
+
+
+    --------------------------------------------------
+    -- SCAN SEMUA TOOL DI BACKPACK
+    --------------------------------------------------
+
+    for _, Tool in ipairs(
+        Backpack:GetChildren()
+    ) do
+
 
         if Tool:IsA("Tool")
         and IsTarget(Tool.Name) then
 
-            return Tool
+
+            table.insert(
+                Batch,
+                Tool
+            )
+
+
+            print(
+                "[BATCH]",
+                Tool.Name
+            )
+
 
         end
+
+
     end
 
 
-    return nil
+    print(
+        "[BATCH TOTAL]",
+        #Batch
+    )
+
+
+    return Batch
+
 end
 
 
 --------------------------------------------------
--- LOOP
+-- EQUIP TOOL LANGSUNG DARI BACKPACK
 --------------------------------------------------
 
-while task.wait(DELAY) do
+local function EquipTargetTool(Tool)
 
-    local Tool = FindEquippedTool()
-
-
-    if Tool then
-
-        local Id = Tool:GetAttribute("Id")
+    local Character =
+        LocalPlayer.Character
 
 
-        if Id then
+    if not Character then
 
-            print("Drop:", Tool.Name, Id)
+        warn(
+            "Character tidak ditemukan"
+        )
+
+        return false
+
+    end
 
 
-            Networking.DroppedItem.RequestDrop:Fire(
-                "HarvestedFruits",
-                Id
+    local Humanoid =
+        Character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+
+    if not Humanoid then
+
+        warn(
+            "Humanoid tidak ditemukan"
+        )
+
+        return false
+
+    end
+
+
+    --------------------------------------------------
+    -- PASTIKAN TOOL MASIH DI BACKPACK
+    --------------------------------------------------
+
+    if Tool.Parent ~= LocalPlayer.Backpack then
+
+        warn(
+            "Tool tidak ada di Backpack:",
+            Tool.Name
+        )
+
+        return false
+
+    end
+
+
+    print(
+        "[EQUIP TARGET]",
+        Tool.Name
+    )
+
+
+    --------------------------------------------------
+    -- EQUIP LANGSUNG
+    --------------------------------------------------
+
+    Humanoid:EquipTool(
+        Tool
+    )
+
+
+    --------------------------------------------------
+    -- TUNGGU TOOL MASUK CHARACTER
+    --------------------------------------------------
+
+    local StartTime =
+        tick()
+
+
+    while tick() - StartTime < 3 do
+
+
+        if Tool.Parent == Character then
+
+
+            print(
+                "[EQUIP SUCCESS]",
+                Tool.Name
             )
+
+
+            return true
+
+
+        end
+
+
+        task.wait(
+            0.05
+        )
+
+
+    end
+
+
+    warn(
+        "[EQUIP TIMEOUT]",
+        Tool.Name
+    )
+
+
+    return false
+
+end
+
+
+--------------------------------------------------
+-- DROP TARGET
+--------------------------------------------------
+
+local function DropTarget(Tool)
+
+    if not Tool then
+
+        return false
+
+    end
+
+
+    --------------------------------------------------
+    -- AMBIL ID
+    --------------------------------------------------
+
+    local Id =
+        Tool:GetAttribute("Id")
+
+
+    if not Id then
+
+        warn(
+            "Tool tidak punya Id:",
+            Tool.Name
+        )
+
+        return false
+
+    end
+
+
+    print(
+        "[DROP]",
+        Tool.Name,
+        Id
+    )
+
+
+    --------------------------------------------------
+    -- REQUEST DROP
+    --------------------------------------------------
+
+    Networking.DroppedItem.RequestDrop:Fire(
+        "HarvestedFruits",
+        Id
+    )
+
+
+    --------------------------------------------------
+    -- TUNGGU DROP SELESAI
+    --------------------------------------------------
+
+    local Character =
+        LocalPlayer.Character
+
+
+    local StartTime =
+        tick()
+
+
+    while tick() - StartTime < 3 do
+
+
+        if not Character
+        or Tool.Parent ~= Character then
+
+
+            print(
+                "[DROP SUCCESS]",
+                Tool.Name
+            )
+
+
+            return true
+
+
+        end
+
+
+        task.wait(
+            0.05
+        )
+
+
+    end
+
+
+    warn(
+        "[DROP TIMEOUT]",
+        Tool.Name
+    )
+
+
+    return false
+
+end
+
+
+--------------------------------------------------
+-- PROCESS SEMUA BATCH
+--------------------------------------------------
+
+local function ProcessBatch(Batch)
+
+
+    --------------------------------------------------
+    -- PROSES SATU PER SATU
+    --------------------------------------------------
+
+    for Index, Tool in ipairs(
+        Batch
+    ) do
+
+
+        print(
+            "--------------------------------"
+        )
+
+
+        print(
+            "[PROCESS]",
+            Index,
+            "/",
+            #Batch
+        )
+
+
+        print(
+            "[ITEM]",
+            Tool.Name
+        )
+
+
+        --------------------------------------------------
+        -- PASTIKAN TOOL MASIH ADA
+        --------------------------------------------------
+
+        if Tool.Parent == LocalPlayer.Backpack then
+
+
+            --------------------------------------------------
+            -- EQUIP LANGSUNG
+            --------------------------------------------------
+
+            local EquipSuccess =
+                EquipTargetTool(
+                    Tool
+                )
+
+
+            if EquipSuccess then
+
+
+                --------------------------------------------------
+                -- DROP
+                --------------------------------------------------
+
+                local DropSuccess =
+                    DropTarget(
+                        Tool
+                    )
+
+
+                if DropSuccess then
+
+                    print(
+                        "[DONE]",
+                        Tool.Name
+                    )
+
+                end
+
+
+                --------------------------------------------------
+                -- DELAY SETELAH DROP
+                --------------------------------------------------
+
+                task.wait(
+                    DROP_WAIT
+                )
+
+
+            end
 
 
         else
 
-            warn("Tool tidak punya Id:", Tool.Name)
+
+            warn(
+                "[SKIP]",
+                Tool.Name,
+                "sudah tidak ada di Backpack"
+            )
+
 
         end
+
+
     end
+
+
+    print(
+        "--------------------------------"
+    )
+
+
+    print(
+        "[BATCH SELESAI]",
+        #Batch,
+        "ITEM"
+    )
+
+
+end
+
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+while task.wait(
+    DELAY
+) do
+
+
+    print("")
+    print("")
+    print(
+        "================================"
+    )
+
+    print(
+        "START NEW CYCLE"
+    )
+
+    print(
+        "================================"
+    )
+
+
+    --------------------------------------------------
+    -- STEP 1
+    -- EQUIP SEMUA ITEM VIA GUI
+    --------------------------------------------------
+
+    print(
+        "[STEP 1] EQUIP ALL VIA GUI"
+    )
+
+
+    EquipAllItem()
+
+
+    --------------------------------------------------
+    -- STEP 2
+    -- TUNGGU 0.5 DETIK
+    --------------------------------------------------
+
+    print(
+        "[STEP 2] WAIT",
+        AFTER_GUI_DELAY
+    )
+
+
+    task.wait(
+        AFTER_GUI_DELAY
+    )
+
+
+    --------------------------------------------------
+    -- STEP 3
+    -- SCAN SEMUA TARGET
+    -- BUAT BATCH
+    --------------------------------------------------
+
+    print(
+        "[STEP 3] CREATE BATCH"
+    )
+
+
+    local Batch =
+        CreateTargetBatch()
+
+
+    --------------------------------------------------
+    -- STEP 4
+    -- PROSES SEMUA BATCH
+    --------------------------------------------------
+
+    if #Batch > 0 then
+
+
+        print(
+            "[STEP 4] PROCESS BATCH"
+        )
+
+
+        ProcessBatch(
+            Batch
+        )
+
+
+    else
+
+
+        print(
+            "[STEP 4] TIDAK ADA TARGET"
+        )
+
+
+    end
+
+
+    --------------------------------------------------
+    -- STEP 5
+    -- BATCH SUDAH SELESAI
+    -- BARU ULANG KE EQUIP ALL
+    --------------------------------------------------
+
+    print(
+        "================================"
+    )
+
+
+    print(
+        "SEMUA TARGET DALAM BATCH SELESAI"
+    )
+
+
+    print(
+        "ULANG KE EQUIP ALL GUI"
+    )
+
+
+    print(
+        "================================"
+    )
+
 
 end
