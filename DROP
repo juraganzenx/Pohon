@@ -34,7 +34,7 @@ local Networking = require(
 
 local DELAY = 1
 
-local GUI_CLICK_DELAY = 0.1
+local GUI_CLICK_DELAY = 0.5
 
 local AFTER_GUI_DELAY = 0.5
 
