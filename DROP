@@ -40,7 +40,7 @@ local AFTER_GUI_DELAY = 0.5
 
 local EQUIP_WAIT = 0.5
 
-local DROP_WAIT = 0.1
+local DROP_WAIT = 0.5
 
 local EQUIP_TIMEOUT = 3
 
