@@ -1,0 +1,102 @@
+--GUI TOTAL FRUIT PROJECT
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Gardens = workspace:WaitForChild("Gardens")
+
+--------------------------------------------------
+-- GET MY PLOT
+--------------------------------------------------
+local function GetMyPlot()
+    for i = 1, 8 do
+        local Plot = Gardens:FindFirstChild("Plot" .. i)
+
+        if Plot and Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            return Plot
+        end
+    end
+
+    return nil
+end
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FruitCounterGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer.PlayerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 250, 0, 75)
+Frame.Position = UDim2.new(0.5, -125, 0, 100)
+Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+Instance.new("UICorner", Frame)
+
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.fromScale(1,1)
+Label.BackgroundTransparency = 1
+Label.Font = Enum.Font.GothamBold
+Label.TextSize = 18
+Label.TextColor3 = Color3.new(1,1,1)
+Label.TextWrapped = true
+Label.Parent = Frame
+
+--------------------------------------------------
+-- COUNT
+--------------------------------------------------
+local function CountData()
+    local Plot = GetMyPlot()
+    if not Plot then
+        return 0, 0, 0
+    end
+
+    local Less = 0
+    local Greater = 0
+    local TotalPlants = 0
+
+    local Plants = Plot:FindFirstChild("Plants")
+    if not Plants then
+        return Less, Greater, TotalPlants
+    end
+
+    for _, Plant in ipairs(Plants:GetChildren()) do
+        TotalPlants += 1
+
+        local Fruits = Plant:FindFirstChild("Fruits")
+        if Fruits then
+            for _, Fruit in ipairs(Fruits:GetChildren()) do
+                local SizeMulti = Fruit:GetAttribute("SizeMulti")
+
+                if typeof(SizeMulti) == "number" then
+                    if SizeMulti < 8 then
+                        Less += 1
+                    elseif SizeMulti > 8 then
+                        Greater += 1
+                    end
+                end
+            end
+        end
+    end
+
+    return Less, Greater, TotalPlants
+end
+
+--------------------------------------------------
+-- UPDATE
+--------------------------------------------------
+while true do
+    local Less, Greater, TotalPlants = CountData()
+
+    Label.Text = string.format(
+        "Plants : %d\n<8 : %d\n>8 : %d",
+        TotalPlants,
+        Less,
+        Greater
+    )
+
+    task.wait(0.5)
+end
