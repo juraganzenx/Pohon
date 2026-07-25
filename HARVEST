@@ -1,109 +1,155 @@
---HARVEST AIRIN s8 PROJECT
+-- HARVEST + SELL FRUIT LOOPa
+-- URUTAN:
+-- 1. HARVEST
+-- 2. FAVORITE FRUIT SizeMultiplier > 8
+-- 3. SELL ALL
+-- 4. UNFAVORITE KEMBALI
+-- 5. ULANGI TERUS
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
 
 local Gardens = workspace:WaitForChild("Gardens")
+local Backpack = LocalPlayer:WaitForChild("Backpack")
 
 --------------------------------------------------
 -- CONFIG
 --------------------------------------------------
+
+-- SELL
+local SIZE_MULTIPLIER_LIMIT = 8
+
+local FAVORITE_DELAY = 0.05
+local BEFORE_SELL_DELAY = 1
+local AFTER_SELL_DELAY = 1
+local UNFAVORITE_DELAY = 0.05
+
+-- Jeda setelah harvest selesai
+local AFTER_HARVEST_DELAY = 1
+
+-- Jeda sebelum siklus berikutnya
+local LOOP_DELAY = 2
+
+-- HARVEST
+local SIZE_THRESHOLD = 8
 
 -- Blacklist Fruit berdasarkan CorePartName
 local BLACKLIST = {
     NAMEFRUIT = true,
 }
 
--- Jika SizeMulti > nilai ini, buah akan menunggu mutasi
-local SIZE_THRESHOLD = 8
-
--- Tunggu 1 menit sebelum mulai harvest
-local START_DELAY = 60
-
 --------------------------------------------------
--- FUNCTIONS
+-- DAFTAR FRUIT YANG DI-FAVORITE
+-- PADA SIKLUS SAAT INI
 --------------------------------------------------
 
--- Cari plot milik player
+local FavoritedFruits = {}
+
+--------------------------------------------------
+-- CARI PLOT MILIK PLAYER
+--------------------------------------------------
+
 local function GetMyPlot()
+
     for i = 1, 8 do
+
         local Plot = Gardens:FindFirstChild("Plot" .. i)
 
         if Plot and Plot:GetAttribute("Owner") == LocalPlayer.Name then
             return Plot
         end
+
     end
 
     return nil
 end
 
 --------------------------------------------------
--- WAIT 1 MINUTE BEFORE START
+-- HARVEST SEMUA YANG MEMENUHI SYARAT
 --------------------------------------------------
 
-print("⏳ Harvest akan dimulai dalam 1 menit...")
-task.wait(START_DELAY)
-print("🚀 Waktu tunggu selesai, mulai harvest!")
+local function HarvestFruits()
 
---------------------------------------------------
--- LOOP
---------------------------------------------------
-
-while task.wait(0) do
     local MyPlot = GetMyPlot()
 
     if not MyPlot then
         warn("❌ Plot milikmu tidak ditemukan!")
-        continue
+        return 0
     end
 
     local Plants = MyPlot:FindFirstChild("Plants")
 
     if not Plants then
         warn("❌ Folder Plants tidak ditemukan!")
-        continue
+        return 0
     end
 
     local harvested = 0
+    local plantCount = 0
 
     for _, Plant in ipairs(Plants:GetChildren()) do
 
+        plantCount += 1
+
         --------------------------------------------------
-        -- Harvest Plant
+        -- HARVEST PLANT
         --------------------------------------------------
 
         local HarvestPart = Plant:FindFirstChild("HarvestPart")
 
         if HarvestPart then
+
             local HarvestPrompt = HarvestPart:FindFirstChild("HarvestPrompt")
 
-            if HarvestPrompt and HarvestPrompt:IsA("ProximityPrompt") then
+            if HarvestPrompt
+                and HarvestPrompt:IsA("ProximityPrompt")
+            then
+
                 pcall(function()
                     fireproximityprompt(HarvestPrompt)
                 end)
 
                 harvested += 1
+
                 task.wait(0.001)
+
             end
+
         end
 
         --------------------------------------------------
-        -- Harvest Fruits
-        -- Size <= SIZE_THRESHOLD  -> Langsung harvest
-        -- Size >  SIZE_THRESHOLD  -> Tunggu sampai ada Mutation
+        -- HARVEST FRUITS
         --------------------------------------------------
 
         local Fruits = Plant:FindFirstChild("Fruits")
 
         if Fruits then
+
             for _, Fruit in ipairs(Fruits:GetChildren()) do
 
+                --------------------------------------------------
+                -- CEK SIZE MULTI
+                --------------------------------------------------
+
                 local SizeMulti = Fruit:GetAttribute("SizeMulti") or 1
+
+                --------------------------------------------------
+                -- CEK MUTATION
+                --------------------------------------------------
+
                 local Mutation = Fruit:GetAttribute("Mutation")
 
-                -- Jika buah besar tapi belum mutasi, skip
+                -- Buah SizeMulti > 8 harus menunggu Mutation
                 if SizeMulti > SIZE_THRESHOLD and not Mutation then
                     continue
                 end
+
+                --------------------------------------------------
+                -- BLACKLIST
+                --------------------------------------------------
 
                 local CorePartName = Fruit:GetAttribute("CorePartName")
 
@@ -111,28 +157,250 @@ while task.wait(0) do
                     continue
                 end
 
+                --------------------------------------------------
+                -- HARVEST
+                --------------------------------------------------
+
                 local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
 
                 if FruitHarvestPart then
-                    local FruitPrompt = FruitHarvestPart:FindFirstChild("HarvestPrompt")
 
-                    if FruitPrompt and FruitPrompt:IsA("ProximityPrompt") then
+                    local FruitPrompt =
+                        FruitHarvestPart:FindFirstChild("HarvestPrompt")
+
+                    if FruitPrompt
+                        and FruitPrompt:IsA("ProximityPrompt")
+                    then
+
                         pcall(function()
                             fireproximityprompt(FruitPrompt)
                         end)
 
                         harvested += 1
+
                         task.wait(0.001)
+
                     end
+
                 end
+
             end
+
         end
+
     end
 
     print(string.format(
-        "✅ [%s] Harvest selesai | Plants: %d | Total Harvest: %d",
+        "🌱 [%s] Harvest selesai | Plants: %d | Total Harvest: %d",
         MyPlot.Name,
-        #Plants:GetChildren(),
+        plantCount,
         harvested
     ))
+
+    return harvested
+end
+
+--------------------------------------------------
+-- FAVORITE SEMUA FRUIT
+-- SizeMultiplier > 8
+--------------------------------------------------
+
+local function FavoriteBigFruits()
+
+    local count = 0
+
+    -- Bersihkan daftar dari siklus sebelumnya
+    table.clear(FavoritedFruits)
+
+    --------------------------------------------------
+    -- SCAN BACKPACK
+    --------------------------------------------------
+
+    for _, Fruit in ipairs(Backpack:GetChildren()) do
+
+        local FruitId = Fruit:GetAttribute("Id")
+        local SizeMultiplier = Fruit:GetAttribute("SizeMultiplier")
+
+        if FruitId
+            and SizeMultiplier
+            and SizeMultiplier > SIZE_MULTIPLIER_LIMIT
+        then
+
+            Networking.Backpack.SetFruitFavorite:Fire(
+                FruitId,
+                true
+            )
+
+            --------------------------------------------------
+            -- SIMPAN ID
+            --------------------------------------------------
+
+            FavoritedFruits[FruitId] = true
+
+            count += 1
+
+            task.wait(FAVORITE_DELAY)
+
+        end
+
+    end
+
+    print(
+        "[SELL LOOP] Favorite:",
+        count,
+        "fruit dengan SizeMultiplier >",
+        SIZE_MULTIPLIER_LIMIT
+    )
+
+    return count
+end
+
+--------------------------------------------------
+-- SELL ALL
+--------------------------------------------------
+
+local function SellAll()
+
+    print("[SELL LOOP] PreviewSellAll")
+
+    Networking.NPCS.PreviewSellAll:Fire()
+
+    task.wait(BEFORE_SELL_DELAY)
+
+    print("[SELL LOOP] SellAll")
+
+    Networking.NPCS.SellAll:Fire()
+
+end
+
+--------------------------------------------------
+-- UNFAVORITE FRUIT YANG TADI DI-FAVORITE
+--------------------------------------------------
+
+local function UnfavoriteBigFruits()
+
+    local count = 0
+
+    for FruitId in pairs(FavoritedFruits) do
+
+        Networking.Backpack.SetFruitFavorite:Fire(
+            FruitId,
+            false
+        )
+
+        count += 1
+
+        task.wait(UNFAVORITE_DELAY)
+
+    end
+
+    print(
+        "[SELL LOOP] Unfavorite:",
+        count,
+        "fruit"
+    )
+
+    table.clear(FavoritedFruits)
+
+end
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+while true do
+
+    print("")
+    print("======================================")
+    print("[MAIN LOOP] START CYCLE")
+    print("======================================")
+
+    --------------------------------------------------
+    -- 1. HARVEST DAHULU
+    --------------------------------------------------
+
+    print("[MAIN LOOP] STEP 1 -> HARVEST")
+
+    local HarvestedCount = HarvestFruits()
+
+    --------------------------------------------------
+    -- 2. TUNGGU BUAH MASUK BACKPACK
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] Menunggu",
+        AFTER_HARVEST_DELAY,
+        "detik setelah harvest..."
+    )
+
+    task.wait(AFTER_HARVEST_DELAY)
+
+    --------------------------------------------------
+    -- 3. FAVORITE SIZE MULTIPLIER > 8
+    --------------------------------------------------
+
+    print("[MAIN LOOP] STEP 2 -> FAVORITE BIG FRUIT")
+
+    local FavoritedCount = FavoriteBigFruits()
+
+    --------------------------------------------------
+    -- 4. TUNGGU FAVORITE TERPROSES
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] Menunggu",
+        BEFORE_SELL_DELAY,
+        "detik sebelum SellAll..."
+    )
+
+    task.wait(BEFORE_SELL_DELAY)
+
+    --------------------------------------------------
+    -- 5. SELL ALL
+    --------------------------------------------------
+
+    print("[MAIN LOOP] STEP 3 -> SELL ALL")
+
+    SellAll()
+
+    --------------------------------------------------
+    -- 6. TUNGGU SELL SELESAI
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] Menunggu",
+        AFTER_SELL_DELAY,
+        "detik setelah SellAll..."
+    )
+
+    task.wait(AFTER_SELL_DELAY)
+
+    --------------------------------------------------
+    -- 7. UNFAVORITE KEMBALI
+    --------------------------------------------------
+
+    print("[MAIN LOOP] STEP 4 -> UNFAVORITE")
+
+    UnfavoriteBigFruits()
+
+    --------------------------------------------------
+    -- 8. SELESAI 1 SIKLUS
+    --------------------------------------------------
+
+    print("======================================")
+    print("[MAIN LOOP] CYCLE SELESAI")
+    print(
+        "[MAIN LOOP] Harvest:",
+        HarvestedCount,
+        "| Favorited:",
+        FavoritedCount
+    )
+    print("======================================")
+
+    --------------------------------------------------
+    -- 9. TUNGGU SEBELUM MULAI LAGI
+    --------------------------------------------------
+
+    task.wait(LOOP_DELAY)
+
 end
