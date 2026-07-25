@@ -1,7 +1,8 @@
--- SELL PROJECT FRUIT SIZE MULTIPLIER < 8
--- FAVORITE FRUIT SIZE MULTIPLIER > 8
+-- SELL FRUIT LOOP
+-- FAVORITE SIZE MULTIPLIER > 8
 -- SELL ALL
--- UNFAVORITE KEMBALI FRUIT YANG TADI DI-FAVORITE
+-- UNFAVORITE KEMBALI
+-- ULANGI TERUS
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,35 +19,34 @@ local Backpack = LocalPlayer:WaitForChild("Backpack")
 local SIZE_MULTIPLIER_LIMIT = 8
 
 local FAVORITE_DELAY = 0.05
-local SELL_DELAY = 1
+local BEFORE_SELL_DELAY = 1
+local AFTER_SELL_DELAY = 1
 local UNFAVORITE_DELAY = 0.05
 
+local LOOP_DELAY = 2
+
 --------------------------------------------------
--- DAFTAR FRUIT YANG KITA FAVORITE
+-- DAFTAR FRUIT YANG DI-FAVORITE
+-- PADA SETIAP SIKLUS
 --------------------------------------------------
 
 local FavoritedFruits = {}
 
 --------------------------------------------------
--- GET SIZE MULTIPLIER
---------------------------------------------------
-
-local function GetSizeMultiplier(Fruit)
-    return Fruit:GetAttribute("SizeMultiplier")
-end
-
---------------------------------------------------
--- FAVORITE SEMUA FRUIT > 8
+-- FAVORITE SEMUA FRUIT SIZE MULTIPLIER > 8
 --------------------------------------------------
 
 local function FavoriteBigFruits()
 
     local count = 0
 
+    -- Bersihkan daftar siklus sebelumnya
+    table.clear(FavoritedFruits)
+
     for _, Fruit in ipairs(Backpack:GetChildren()) do
 
         local FruitId = Fruit:GetAttribute("Id")
-        local SizeMultiplier = GetSizeMultiplier(Fruit)
+        local SizeMultiplier = Fruit:GetAttribute("SizeMultiplier")
 
         if FruitId
             and SizeMultiplier
@@ -58,7 +58,7 @@ local function FavoriteBigFruits()
                 true
             )
 
-            -- Simpan ID fruit yang kita favorite
+            -- Simpan ID untuk di-unfavorite setelah SellAll
             FavoritedFruits[FruitId] = true
 
             count += 1
@@ -67,7 +67,12 @@ local function FavoriteBigFruits()
         end
     end
 
-    print("Total fruit SizeMultiplier > 8 yang di-favorite:", count)
+    print(
+        "[SELL LOOP] Favorite:",
+        count,
+        "fruit dengan SizeMultiplier >",
+        SIZE_MULTIPLIER_LIMIT
+    )
 end
 
 --------------------------------------------------
@@ -76,20 +81,20 @@ end
 
 local function SellAll()
 
-    print("Preview Sell All...")
+    print("[SELL LOOP] PreviewSellAll")
 
     Networking.NPCS.PreviewSellAll:Fire()
 
-    task.wait(SELL_DELAY)
+    task.wait(BEFORE_SELL_DELAY)
 
-    print("Sell All...")
+    print("[SELL LOOP] SellAll")
 
     Networking.NPCS.SellAll:Fire()
 
 end
 
 --------------------------------------------------
--- UNFAVORITE FRUIT YANG TADI KITA FAVORITE
+-- UNFAVORITE FRUIT YANG TADI DI-FAVORITE
 --------------------------------------------------
 
 local function UnfavoriteBigFruits()
@@ -108,59 +113,62 @@ local function UnfavoriteBigFruits()
         task.wait(UNFAVORITE_DELAY)
     end
 
-    print("Total fruit yang di-unfavorite:", count)
+    print(
+        "[SELL LOOP] Unfavorite:",
+        count,
+        "fruit"
+    )
 
-    -- Bersihkan daftar
     table.clear(FavoritedFruits)
 
 end
 
 --------------------------------------------------
--- MAIN
+-- MAIN LOOP
 --------------------------------------------------
 
-print("================================")
-print("START SELL FRUIT")
-print("================================")
+while true do
 
---------------------------------------------------
--- STEP 1
--- FAVORITE SEMUA FRUIT SizeMultiplier > 8
---------------------------------------------------
+    print("==============================")
+    print("[SELL LOOP] START CYCLE")
+    print("==============================")
 
-FavoriteBigFruits()
+    --------------------------------------------------
+    -- 1. FAVORITE FRUIT > 8
+    --------------------------------------------------
 
---------------------------------------------------
--- STEP 2
--- TUNGGU REQUEST FAVORITE
---------------------------------------------------
+    FavoriteBigFruits()
 
-task.wait(1)
+    --------------------------------------------------
+    -- 2. TUNGGU REQUEST FAVORITE
+    --------------------------------------------------
 
---------------------------------------------------
--- STEP 3
--- SELL ALL
---------------------------------------------------
+    task.wait(BEFORE_SELL_DELAY)
 
-SellAll()
+    --------------------------------------------------
+    -- 3. SELL ALL
+    --------------------------------------------------
 
---------------------------------------------------
--- STEP 4
--- TUNGGU PROSES SELL SELESAI
---------------------------------------------------
+    SellAll()
 
-task.wait(SELL_DELAY)
+    --------------------------------------------------
+    -- 4. TUNGGU SELL SELESAI
+    --------------------------------------------------
 
---------------------------------------------------
--- STEP 5
--- UNFAVORITE KEMBALI FRUIT > 8
---------------------------------------------------
+    task.wait(AFTER_SELL_DELAY)
 
-print("SellAll selesai.")
-print("Mengembalikan status Favorite...")
+    --------------------------------------------------
+    -- 5. UNFAVORITE KEMBALI
+    --------------------------------------------------
 
-UnfavoriteBigFruits()
+    UnfavoriteBigFruits()
 
-print("================================")
-print("SELL FRUIT SELESAI")
-print("================================")
+    --------------------------------------------------
+    -- 6. TUNGGU SEBELUM LOOP BERIKUTNYA
+    --------------------------------------------------
+
+    print("[SELL LOOP] CYCLE SELESAI")
+
+    task.wait(LOOP_DELAY)
+
+end
