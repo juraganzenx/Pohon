@@ -1,0 +1,166 @@
+-- SELL PROJECT FRUIT SIZE MULTIPLIER < 8
+-- FAVORITE FRUIT SIZE MULTIPLIER > 8
+-- SELL ALL
+-- UNFAVORITE KEMBALI FRUIT YANG TADI DI-FAVORITE
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local SIZE_MULTIPLIER_LIMIT = 8
+
+local FAVORITE_DELAY = 0.05
+local SELL_DELAY = 1
+local UNFAVORITE_DELAY = 0.05
+
+--------------------------------------------------
+-- DAFTAR FRUIT YANG KITA FAVORITE
+--------------------------------------------------
+
+local FavoritedFruits = {}
+
+--------------------------------------------------
+-- GET SIZE MULTIPLIER
+--------------------------------------------------
+
+local function GetSizeMultiplier(Fruit)
+    return Fruit:GetAttribute("SizeMultiplier")
+end
+
+--------------------------------------------------
+-- FAVORITE SEMUA FRUIT > 8
+--------------------------------------------------
+
+local function FavoriteBigFruits()
+
+    local count = 0
+
+    for _, Fruit in ipairs(Backpack:GetChildren()) do
+
+        local FruitId = Fruit:GetAttribute("Id")
+        local SizeMultiplier = GetSizeMultiplier(Fruit)
+
+        if FruitId
+            and SizeMultiplier
+            and SizeMultiplier > SIZE_MULTIPLIER_LIMIT
+        then
+
+            Networking.Backpack.SetFruitFavorite:Fire(
+                FruitId,
+                true
+            )
+
+            -- Simpan ID fruit yang kita favorite
+            FavoritedFruits[FruitId] = true
+
+            count += 1
+
+            task.wait(FAVORITE_DELAY)
+        end
+    end
+
+    print("Total fruit SizeMultiplier > 8 yang di-favorite:", count)
+end
+
+--------------------------------------------------
+-- SELL ALL
+--------------------------------------------------
+
+local function SellAll()
+
+    print("Preview Sell All...")
+
+    Networking.NPCS.PreviewSellAll:Fire()
+
+    task.wait(SELL_DELAY)
+
+    print("Sell All...")
+
+    Networking.NPCS.SellAll:Fire()
+
+end
+
+--------------------------------------------------
+-- UNFAVORITE FRUIT YANG TADI KITA FAVORITE
+--------------------------------------------------
+
+local function UnfavoriteBigFruits()
+
+    local count = 0
+
+    for FruitId in pairs(FavoritedFruits) do
+
+        Networking.Backpack.SetFruitFavorite:Fire(
+            FruitId,
+            false
+        )
+
+        count += 1
+
+        task.wait(UNFAVORITE_DELAY)
+    end
+
+    print("Total fruit yang di-unfavorite:", count)
+
+    -- Bersihkan daftar
+    table.clear(FavoritedFruits)
+
+end
+
+--------------------------------------------------
+-- MAIN
+--------------------------------------------------
+
+print("================================")
+print("START SELL FRUIT")
+print("================================")
+
+--------------------------------------------------
+-- STEP 1
+-- FAVORITE SEMUA FRUIT SizeMultiplier > 8
+--------------------------------------------------
+
+FavoriteBigFruits()
+
+--------------------------------------------------
+-- STEP 2
+-- TUNGGU REQUEST FAVORITE
+--------------------------------------------------
+
+task.wait(1)
+
+--------------------------------------------------
+-- STEP 3
+-- SELL ALL
+--------------------------------------------------
+
+SellAll()
+
+--------------------------------------------------
+-- STEP 4
+-- TUNGGU PROSES SELL SELESAI
+--------------------------------------------------
+
+task.wait(SELL_DELAY)
+
+--------------------------------------------------
+-- STEP 5
+-- UNFAVORITE KEMBALI FRUIT > 8
+--------------------------------------------------
+
+print("SellAll selesai.")
+print("Mengembalikan status Favorite...")
+
+UnfavoriteBigFruits()
+
+print("================================")
+print("SELL FRUIT SELESAI")
+print("================================")
