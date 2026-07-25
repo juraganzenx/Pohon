@@ -16,6 +16,9 @@ local BLACKLIST = {
 -- Jika SizeMulti > nilai ini, buah akan menunggu mutasi
 local SIZE_THRESHOLD = 8
 
+-- Tunggu 1 menit sebelum mulai harvest
+local START_DELAY = 60
+
 --------------------------------------------------
 -- FUNCTIONS
 --------------------------------------------------
@@ -32,6 +35,14 @@ local function GetMyPlot()
 
     return nil
 end
+
+--------------------------------------------------
+-- WAIT 1 MINUTE BEFORE START
+--------------------------------------------------
+
+print("⏳ Harvest akan dimulai dalam 1 menit...")
+task.wait(START_DELAY)
+print("🚀 Waktu tunggu selesai, mulai harvest!")
 
 --------------------------------------------------
 -- LOOP
