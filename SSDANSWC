@@ -1,5 +1,6 @@
 -- SPRINKLER + SUPER WATERING PROJECT
--- V2 JIKA BUAH SIZE 7 <20
+-- V2 JIKA BUAH SIZE8 <20
+-- WATERING CAN DELAY 20 DETIK
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,7 +19,8 @@ local CONFIG = {
 
     AFTER_SPRINKLER_DELAY = 1,
 
-    AFTER_WATER_DELAY = 3,
+    -- Delay setelah Watering Can digunakan
+    AFTER_WATER_DELAY = 20,
 
     WATERING_CAN = "Super Watering Can",
 
@@ -55,11 +57,6 @@ local CONFIG = {
 }
 
 
-
-
-
-
-
 --------------------------------------------------
 -- GET PLOT
 --------------------------------------------------
@@ -79,40 +76,33 @@ local function GetPlot()
 
 end
 
+
 --------------------------------------------------
--- COUNT FRUITS
+-- COUNT BIG FRUITS
 --------------------------------------------------
 
-local function CountFruits(MinSize)
+local function CountBigFruits()
 
     local Plot = GetPlot()
-    if not Plot then
-        return 0
-    end
 
-    local Plants = Plot:FindFirstChild("Plants")
-    if not Plants then
+    if not Plot then
         return 0
     end
 
     local Count = 0
 
-    for _, Plant in ipairs(Plants:GetChildren()) do
+    for _,Obj in ipairs(Plot:GetDescendants()) do
 
-        local Fruits = Plant:FindFirstChild("Fruits")
+        if Obj:IsA("BasePart") then
 
-        if Fruits then
+            local SizeMulti =
+                Obj:GetAttribute("SizeMulti")
 
-            for _, Fruit in ipairs(Fruits:GetChildren()) do
 
-                local SizeMulti = Fruit:GetAttribute("SizeMulti")
+            if typeof(SizeMulti) == "number"
+            and SizeMulti > 8 then
 
-                if typeof(SizeMulti) == "number"
-                and SizeMulti > MinSize then
-
-                    Count += 1
-
-                end
+                Count += 1
 
             end
 
@@ -125,15 +115,15 @@ local function CountFruits(MinSize)
 end
 
 
-
-
 --------------------------------------------------
 -- UNEQUIP
 --------------------------------------------------
 
 local function UnequipTools()
 
-    local Character = LocalPlayer.Character
+    local Character =
+        LocalPlayer.Character
+
 
     if not Character then
         return
@@ -145,11 +135,12 @@ local function UnequipTools()
 
 
     if Humanoid then
+
         Humanoid:UnequipTools()
+
     end
 
 end
-
 
 
 --------------------------------------------------
@@ -167,6 +158,9 @@ local function EquipSprinkler(Name)
         LocalPlayer:WaitForChild("Backpack")
 
 
+    --------------------------------------------------
+    -- CHECK EQUIPPED
+    --------------------------------------------------
 
     for _,Tool in ipairs(Character:GetChildren()) do
 
@@ -180,6 +174,9 @@ local function EquipSprinkler(Name)
     end
 
 
+    --------------------------------------------------
+    -- CHECK BACKPACK
+    --------------------------------------------------
 
     for _,Tool in ipairs(Backpack:GetChildren()) do
 
@@ -212,7 +209,6 @@ local function EquipSprinkler(Name)
 end
 
 
-
 --------------------------------------------------
 -- EQUIP WATER CAN
 --------------------------------------------------
@@ -228,22 +224,31 @@ local function EquipWateringCan()
         LocalPlayer:WaitForChild("Backpack")
 
 
+    --------------------------------------------------
+    -- CHECK EQUIPPED
+    --------------------------------------------------
 
     local Tool =
         Character:FindFirstChild(CONFIG.WATERING_CAN)
 
 
     if Tool then
+
         return Tool
+
     end
 
 
+    --------------------------------------------------
+    -- CHECK BACKPACK
+    --------------------------------------------------
 
     Tool =
         Backpack:FindFirstChild(CONFIG.WATERING_CAN)
 
 
     if Tool then
+
 
         local Humanoid =
             Character:FindFirstChildOfClass("Humanoid")
@@ -268,7 +273,6 @@ local function EquipWateringCan()
 end
 
 
-
 --------------------------------------------------
 -- SPRINKLER CHECK
 --------------------------------------------------
@@ -291,9 +295,8 @@ local function HasSprinkler(Folder,Name)
 end
 
 
-
 --------------------------------------------------
--- POSITION
+-- GET FRONT BED POSITION
 --------------------------------------------------
 
 local function GetFrontBedPosition(Plot)
@@ -307,12 +310,12 @@ local function GetFrontBedPosition(Plot)
     end
 
 
-
     local Bed =
         Visual:FindFirstChild("FRONT_BedSection")
 
 
     if Bed then
+
 
         local BottomFace =
             Bed:FindFirstChild("BottomFace")
@@ -332,9 +335,8 @@ local function GetFrontBedPosition(Plot)
 end
 
 
-
 --------------------------------------------------
--- PLACE SPRINKLER
+-- PLACE SPRINKLERS
 --------------------------------------------------
 
 local function PlaceSprinklers()
@@ -348,7 +350,6 @@ local function PlaceSprinklers()
     end
 
 
-
     local Folder =
         Plot:FindFirstChild("Sprinklers")
 
@@ -356,7 +357,6 @@ local function PlaceSprinklers()
     if not Folder then
         return
     end
-
 
 
     local Base =
@@ -368,6 +368,9 @@ local function PlaceSprinklers()
     end
 
 
+    --------------------------------------------------
+    -- PLACE EACH SPRINKLER
+    --------------------------------------------------
 
     for _,Name in ipairs(CONFIG.SPRINKLERS) do
 
@@ -377,7 +380,6 @@ local function PlaceSprinklers()
 
             local Tool =
                 EquipSprinkler(Name)
-
 
 
             if Tool then
@@ -400,7 +402,11 @@ local function PlaceSprinklers()
                 )
 
 
-                print("[SPRINKLER]",Name,"PLACED")
+                print(
+                    "[SPRINKLER]",
+                    Name,
+                    "PLACED"
+                )
 
 
                 task.wait(.5)
@@ -412,14 +418,17 @@ local function PlaceSprinklers()
     end
 
 
+    --------------------------------------------------
+    -- UNEQUIP AFTER PLACING
+    --------------------------------------------------
+
     UnequipTools()
 
 end
 
 
-
 --------------------------------------------------
--- WATERING CAN
+-- USE WATERING CAN
 --------------------------------------------------
 
 local function UseWateringCan()
@@ -433,21 +442,31 @@ local function UseWateringCan()
     end
 
 
+    --------------------------------------------------
+    -- EQUIP WATERING CAN
+    --------------------------------------------------
 
     local Tool =
         EquipWateringCan()
 
 
-
     if not Tool then
+
+        print(
+            "[WATER] Super Watering Can NOT FOUND"
+        )
+
         return
+
     end
 
 
+    --------------------------------------------------
+    -- GET POSITION
+    --------------------------------------------------
 
     local Position =
         GetFrontBedPosition(Plot)
-
 
 
     if Position then
@@ -455,7 +474,8 @@ local function UseWateringCan()
 
         Networking.WateringCan.UseWateringCan:Fire(
 
-            Position + Vector3.new(0,3,0),
+            Position +
+            Vector3.new(0,3,0),
 
             CONFIG.WATERING_CAN,
 
@@ -464,11 +484,16 @@ local function UseWateringCan()
         )
 
 
-        print("[WATER] USED")
+        print(
+            "[WATER] USED"
+        )
 
     end
 
 
+    --------------------------------------------------
+    -- UNEQUIP
+    --------------------------------------------------
 
     task.wait(.2)
 
@@ -477,55 +502,96 @@ local function UseWateringCan()
 end
 
 
-
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
 
 while task.wait(CONFIG.CHECK_DELAY) do
 
+
     --------------------------------------------------
-    -- SPRINKLER
+    -- WAIT UNTIL BIG FRUIT < 20
     --------------------------------------------------
 
-    local BigFruit = CountFruits(8)
+    while true do
 
-    if BigFruit < 40 then
 
-        print("[ACTION] SPRINKLER | Size > 8 =", BigFruit)
+        local BigFruit =
+            CountBigFruits()
 
-        pcall(function()
-            PlaceSprinklers()
-        end)
 
-        task.wait(CONFIG.AFTER_SPRINKLER_DELAY)
+        if BigFruit < 50 then
 
-    else
+            break
 
-        print("[SKIP] SPRINKLER | Size > 8 =", BigFruit)
+        end
+
+
+        print(
+            "[PAUSE] Big Fruit >8 =",
+            BigFruit
+        )
+
+
+        task.wait(2)
 
     end
 
+
     --------------------------------------------------
-    -- WATERING CAN
+    -- ACTION
     --------------------------------------------------
 
-    local SmallFruit = CountFruits(0.1)
+    print(
+        "[ACTION] SPRINKLER + WATER"
+    )
 
-    if SmallFruit < 40 then
 
-        print("[ACTION] WATER | Size > 0.1 =", SmallFruit)
+    --------------------------------------------------
+    -- PLACE SPRINKLERS
+    --------------------------------------------------
 
-        pcall(function()
-            UseWateringCan()
-        end)
+    pcall(function()
 
-    else
+        PlaceSprinklers()
 
-        print("[SKIP] WATER | Size > 0.1 =", SmallFruit)
+    end)
 
-    end
 
-    task.wait(CONFIG.AFTER_WATER_DELAY)
+    --------------------------------------------------
+    -- WAIT AFTER SPRINKLER
+    --------------------------------------------------
+
+    task.wait(
+        CONFIG.AFTER_SPRINKLER_DELAY
+    )
+
+
+    --------------------------------------------------
+    -- USE WATERING CAN
+    --------------------------------------------------
+
+    pcall(function()
+
+        UseWateringCan()
+
+    end)
+
+
+    --------------------------------------------------
+    -- WAIT 20 SECONDS
+    -- BEFORE NEXT CYCLE
+    --------------------------------------------------
+
+    print(
+        "[WAIT] Next cycle in",
+        CONFIG.AFTER_WATER_DELAY,
+        "seconds"
+    )
+
+
+    task.wait(
+        CONFIG.AFTER_WATER_DELAY
+    )
 
 end
