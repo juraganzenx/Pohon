@@ -1,5 +1,5 @@
 -- SPRINKLER + SUPER WATERING PROJECT
--- V2 JIKA BUAH SIZE8 <20
+-- V2 JIKA BUAH SIZE 7 <20
 -- WATERING CAN DELAY 20 DETIK
 
 local Players = game:GetService("Players")
@@ -520,7 +520,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
             CountBigFruits()
 
 
-        if BigFruit < 50 then
+        if BigFruit < 20 then
 
             break
 
