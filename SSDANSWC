@@ -490,7 +490,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
 
     local BigFruit = CountFruits(8)
 
-    if BigFruit < 50 then
+    if BigFruit < 40 then
 
         print("[ACTION] SPRINKLER | Size > 8 =", BigFruit)
 
@@ -512,7 +512,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
 
     local SmallFruit = CountFruits(0.1)
 
-    if SmallFruit < 50 then
+    if SmallFruit < 40 then
 
         print("[ACTION] WATER | Size > 0.1 =", SmallFruit)
 
