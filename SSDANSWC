@@ -22,7 +22,7 @@ local CONFIG = {
     AFTER_WATER_DELAY = 3,
 
     -- COOLDOWN WATERING CAN
-    WATERING_CAN_DELAY = 20,
+    WATERING_CAN_DELAY = 60,
 
     WATERING_CAN = "Super Watering Can",
 
