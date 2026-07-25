@@ -1,5 +1,5 @@
 -- SPRINKLER + SUPER WATERING PROJECT
--- MOON BLOOM PAUSE VERSION
+-- V2 JIKA BUAH SIZE 7 <20
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,53 +56,7 @@ local CONFIG = {
 
 
 
---------------------------------------------------
--- CHECK MOON BLOOM
---------------------------------------------------
 
-local function HasMoonBloom()
-
-    local Backpack = LocalPlayer:FindFirstChild("Backpack")
-
-
-    if Backpack then
-
-        for _,Item in ipairs(Backpack:GetChildren()) do
-
-            if string.find(Item.Name, "Moon Bloom") then
-
-                return true
-
-            end
-
-        end
-
-    end
-
-
-
-    local Character = LocalPlayer.Character
-
-
-    if Character then
-
-        for _,Item in ipairs(Character:GetChildren()) do
-
-            if Item:IsA("Tool")
-            and string.find(Item.Name, "Moon Bloom") then
-
-                return true
-
-            end
-
-        end
-
-    end
-
-
-    return false
-
-end
 
 
 
@@ -124,6 +78,52 @@ local function GetPlot()
     return workspace.Gardens:FindFirstChild("Plot"..PlotId), PlotId
 
 end
+
+--------------------------------------------------
+-- COUNT FRUITS
+--------------------------------------------------
+
+local function CountFruits(MinSize)
+
+    local Plot = GetPlot()
+    if not Plot then
+        return 0
+    end
+
+    local Plants = Plot:FindFirstChild("Plants")
+    if not Plants then
+        return 0
+    end
+
+    local Count = 0
+
+    for _, Plant in ipairs(Plants:GetChildren()) do
+
+        local Fruits = Plant:FindFirstChild("Fruits")
+
+        if Fruits then
+
+            for _, Fruit in ipairs(Fruits:GetChildren()) do
+
+                local SizeMulti = Fruit:GetAttribute("SizeMulti")
+
+                if typeof(SizeMulti) == "number"
+                and SizeMulti > MinSize then
+
+                    Count += 1
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return Count
+
+end
+
 
 
 
@@ -484,57 +484,48 @@ end
 
 while task.wait(CONFIG.CHECK_DELAY) do
 
-
     --------------------------------------------------
-    -- PAUSE IF MOON BLOOM EXISTS
+    -- SPRINKLER
     --------------------------------------------------
 
-    if HasMoonBloom() then
+    local BigFruit = CountFruits(8)
 
+    if BigFruit < 50 then
 
-        print("[PAUSE] Moon Bloom ditemukan")
+        print("[ACTION] SPRINKLER | Size > 8 =", BigFruit)
 
+        pcall(function()
+            PlaceSprinklers()
+        end)
 
-        repeat
+        task.wait(CONFIG.AFTER_SPRINKLER_DELAY)
 
-            task.wait(2)
+    else
 
-        until not HasMoonBloom()
-
-
-
-        print("[RESUME] Moon Bloom hilang")
-
+        print("[SKIP] SPRINKLER | Size > 8 =", BigFruit)
 
     end
 
+    --------------------------------------------------
+    -- WATERING CAN
+    --------------------------------------------------
 
+    local SmallFruit = CountFruits(0.1)
 
-    print("[ACTION] SPRINKLER + WATER")
+    if SmallFruit < 50 then
 
+        print("[ACTION] WATER | Size > 0.1 =", SmallFruit)
 
+        pcall(function()
+            UseWateringCan()
+        end)
 
-    pcall(function()
+    else
 
-        PlaceSprinklers()
+        print("[SKIP] WATER | Size > 0.1 =", SmallFruit)
 
-    end)
-
-
-
-    task.wait(CONFIG.AFTER_SPRINKLER_DELAY)
-
-
-
-    pcall(function()
-
-        UseWateringCan()
-
-    end)
-
-
+    end
 
     task.wait(CONFIG.AFTER_WATER_DELAY)
-
 
 end
