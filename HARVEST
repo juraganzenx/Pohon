@@ -1,13 +1,24 @@
---HARVERS
+--HARVEST AIRIN s8 PROJECT
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local Gardens = workspace:WaitForChild("Gardens")
 
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
 -- Blacklist Fruit berdasarkan CorePartName
 local BLACKLIST = {
     NAMEFRUIT = true,
 }
+
+-- Jika SizeMulti > nilai ini, buah akan menunggu mutasi
+local SIZE_THRESHOLD = 8
+
+--------------------------------------------------
+-- FUNCTIONS
+--------------------------------------------------
 
 -- Cari plot milik player
 local function GetMyPlot()
@@ -21,6 +32,10 @@ local function GetMyPlot()
 
     return nil
 end
+
+--------------------------------------------------
+-- LOOP
+--------------------------------------------------
 
 while task.wait(0) do
     local MyPlot = GetMyPlot()
@@ -40,9 +55,11 @@ while task.wait(0) do
     local harvested = 0
 
     for _, Plant in ipairs(Plants:GetChildren()) do
-        ----------------------------------------------------------------
+
+        --------------------------------------------------
         -- Harvest Plant
-        ----------------------------------------------------------------
+        --------------------------------------------------
+
         local HarvestPart = Plant:FindFirstChild("HarvestPart")
 
         if HarvestPart then
@@ -58,51 +75,28 @@ while task.wait(0) do
             end
         end
 
-        ----------------------------------------------------------------
-        -- Harvest Fruits (Prioritas Mutation)
-        ----------------------------------------------------------------
+        --------------------------------------------------
+        -- Harvest Fruits
+        -- Size <= SIZE_THRESHOLD  -> Langsung harvest
+        -- Size >  SIZE_THRESHOLD  -> Tunggu sampai ada Mutation
+        --------------------------------------------------
+
         local Fruits = Plant:FindFirstChild("Fruits")
 
         if Fruits then
-            -- PASS 1: Harvest buah yang punya Mutation dulu
             for _, Fruit in ipairs(Fruits:GetChildren()) do
-                if not Fruit:GetAttribute("Mutation") then
+
+                local SizeMulti = Fruit:GetAttribute("SizeMulti") or 1
+                local Mutation = Fruit:GetAttribute("Mutation")
+
+                -- Jika buah besar tapi belum mutasi, skip
+                if SizeMulti > SIZE_THRESHOLD and not Mutation then
                     continue
                 end
 
                 local CorePartName = Fruit:GetAttribute("CorePartName")
 
                 if BLACKLIST[CorePartName] then
-                    print("⏭️ Skip Fruit:", Fruit.Name, "|", CorePartName)
-                    continue
-                end
-
-                local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
-
-                if FruitHarvestPart then
-                    local FruitPrompt = FruitHarvestPart:FindFirstChild("HarvestPrompt")
-
-                    if FruitPrompt and FruitPrompt:IsA("ProximityPrompt") then
-                        pcall(function()
-                            fireproximityprompt(FruitPrompt)
-                        end)
-
-                        harvested += 1
-                        task.wait(0.001)
-                    end
-                end
-            end
-
-            -- PASS 2: Harvest buah biasa
-            for _, Fruit in ipairs(Fruits:GetChildren()) do
-                if Fruit:GetAttribute("Mutation") then
-                    continue
-                end
-
-                local CorePartName = Fruit:GetAttribute("CorePartName")
-
-                if BLACKLIST[CorePartName] then
-                    print("⏭️ Skip Fruit:", Fruit.Name, "|", CorePartName)
                     continue
                 end
 
