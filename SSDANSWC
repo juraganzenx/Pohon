@@ -600,7 +600,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
         CountFruits(8)
 
 
-    if BigFruit < 50 then
+    if BigFruit < 300 then
 
 
         print(
@@ -641,7 +641,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
         CountFruits(8)
 
 
-    if SmallFruit < 50 then
+    if SmallFruit < 300 then
 
 
         print(
