@@ -1,96 +1,56 @@
 --==================================================
--- HARVEST + SELL + AUTO SENDd
+-- HARVEST + SELL + AUTO SEND
+-- PERSISTENT PLAYER LIST
 -- MODERN GUI
 --
--- FLOW:
--- 1. HARVEST
--- 2. FAVORITE FRUIT SizeMultiplier > 8
--- 3. SELL ALL
--- 4. UNFAVORITE
--- 5. AUTO SEND
---
 -- FEATURES:
--- - START / STOP
--- - ADD PLAYER
--- - REMOVE PLAYER VIA LIST
--- - TRADE HISTORY
--- - VALUE HISTORY
--- - AUTO RESET HISTORY
--- - MINIMIZE / MAXIMIZE
--- - DRAG GUI
--- - NO PRINT / WARN
+-- 1. HEADER
+-- 2. MINIMIZE / RESTORE
+-- 3. START / STOP
+-- 4. CURRENT STEP
+-- 5. ADD PLAYER
+-- 6. REMOVE PLAYER FROM LIST
+-- 7. TRADE HISTORY
+-- 8. VALUE HISTORY
+-- 9. PERSISTENT PLAYER LIST
+-- 10. PERSISTENT TRADE HISTORY
+-- 11. AUTO START
+-- 12. DRAG GUI
+-- 13. REALTIME HISTORY
+--
+-- FILES:
+-- TradePlayers.json
+-- TradeHistory.json
 --==================================================
 
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
---==================================================
--- SERVICES
---==================================================
-
-local Players =
-    game:GetService("Players")
-
-local ReplicatedStorage =
-    game:GetService("ReplicatedStorage")
-
-local HttpService =
-    game:GetService("HttpService")
-
-local UserInputService =
-    game:GetService("UserInputService")
-
-
---==================================================
--- PLAYER
---==================================================
-
-local LocalPlayer =
-    Players.LocalPlayer
-
-local PlayerGui =
-    LocalPlayer:WaitForChild(
-        "PlayerGui"
-    )
-
-local Backpack =
-    LocalPlayer:WaitForChild(
-        "Backpack"
-    )
-
-
---==================================================
--- MODULES
---==================================================
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local Networking =
     require(
-        ReplicatedStorage
-            .SharedModules
-            .Networking
+        ReplicatedStorage.SharedModules.Networking
     )
 
 local FruitValueCalc =
     require(
-        ReplicatedStorage
-            .SharedModules
-            .FruitValueCalc
+        ReplicatedStorage.SharedModules.FruitValueCalc
     )
 
 local NumberUtils =
     require(
-        ReplicatedStorage
-            .SharedModules
-            .NumberUtils
+        ReplicatedStorage.SharedModules.NumberUtils
     )
-
-
---==================================================
--- GARDENS
---==================================================
 
 local Gardens =
-    workspace:WaitForChild(
-        "Gardens"
-    )
+    workspace:WaitForChild("Gardens")
+
+local Backpack =
+    LocalPlayer:WaitForChild("Backpack")
 
 
 --==================================================
@@ -117,6 +77,9 @@ local TARGET_VALUE = 1000000000
 
 local MAX_FRUIT_SEND = 20
 
+local PLAYERS_FILE =
+    "TradePlayers.json"
+
 local HISTORY_FILE =
     "TradeHistory.json"
 
@@ -125,16 +88,38 @@ local NOTE =
 
 
 --==================================================
--- DEFAULT TARGET USERNAMES
+-- DEFAULT USERNAME
 --==================================================
 
-local TARGET_USERNAMES = {
+local DEFAULT_USERNAMES = {
 
-    "1",
+    "SD214A",
 
-    "2"
+    "FLK41H",
+
+    "GK3AV2",
+
+    "ZW3P11",
+
+    "3H42ED",
+
+    "ADGD2D",
+
+    "ADG2DA",
+
+    "GD4G32",
+
+    "34LA72"
 
 }
+
+
+--==================================================
+-- TARGET USERNAMES
+-- Loaded from TradePlayers.json
+--==================================================
+
+local TARGET_USERNAMES = {}
 
 
 --==================================================
@@ -150,6 +135,8 @@ local FavoritedFruits = {}
 
 local History = {}
 
+local IsMinimized = false
+
 
 --==================================================
 -- BLACKLIST
@@ -160,6 +147,297 @@ local BLACKLIST = {
     NAMEFRUIT = true
 
 }
+
+
+--==================================================
+-- FILE API
+--==================================================
+
+local function IsFileAPIAvailable()
+
+    return
+        isfile
+        and readfile
+        and writefile
+
+end
+
+
+--==================================================
+-- SAVE PLAYER LIST
+--==================================================
+
+local function SavePlayers()
+
+    if not IsFileAPIAvailable() then
+        return false
+    end
+
+    local Success =
+        pcall(
+            function()
+
+                writefile(
+                    PLAYERS_FILE,
+                    HttpService:JSONEncode(
+                        TARGET_USERNAMES
+                    )
+                )
+
+            end
+        )
+
+    return Success
+
+end
+
+
+--==================================================
+-- LOAD PLAYER LIST
+--==================================================
+
+local function LoadPlayers()
+
+    table.clear(
+        TARGET_USERNAMES
+    )
+
+    if not IsFileAPIAvailable() then
+
+        for _, Username in ipairs(
+            DEFAULT_USERNAMES
+        ) do
+
+            table.insert(
+                TARGET_USERNAMES,
+                Username
+            )
+
+        end
+
+        return
+
+    end
+
+
+    if not isfile(
+        PLAYERS_FILE
+    ) then
+
+        for _, Username in ipairs(
+            DEFAULT_USERNAMES
+        ) do
+
+            table.insert(
+                TARGET_USERNAMES,
+                Username
+            )
+
+        end
+
+        SavePlayers()
+
+        return
+
+    end
+
+
+    local Success, Data =
+        pcall(
+            function()
+
+                return
+                    HttpService:JSONDecode(
+                        readfile(
+                            PLAYERS_FILE
+                        )
+                    )
+
+            end
+        )
+
+
+    if Success
+        and type(Data) == "table" then
+
+        for _, Username in ipairs(
+            Data
+        ) do
+
+            if type(Username) == "string"
+                and Username ~= "" then
+
+                table.insert(
+                    TARGET_USERNAMES,
+                    Username
+                )
+
+            end
+
+        end
+
+    end
+
+end
+
+
+--==================================================
+-- CREATE DEFAULT HISTORY
+--==================================================
+
+local function CreateDefaultHistory()
+
+    local NewHistory = {}
+
+    for _, Username in ipairs(
+        TARGET_USERNAMES
+    ) do
+
+        NewHistory[Username] = {
+
+            Status =
+                "Belum kirim",
+
+            Value = 0
+
+        }
+
+    end
+
+    return NewHistory
+
+end
+
+
+--==================================================
+-- SAVE HISTORY
+--==================================================
+
+local function SaveHistory()
+
+    if not IsFileAPIAvailable() then
+        return false
+    end
+
+    local Success =
+        pcall(
+            function()
+
+                writefile(
+                    HISTORY_FILE,
+                    HttpService:JSONEncode(
+                        History
+                    )
+                )
+
+            end
+        )
+
+    return Success
+
+end
+
+
+--==================================================
+-- LOAD HISTORY
+--==================================================
+
+local function LoadHistory()
+
+    if not IsFileAPIAvailable() then
+
+        History =
+            CreateDefaultHistory()
+
+        return
+
+    end
+
+
+    if not isfile(
+        HISTORY_FILE
+    ) then
+
+        History =
+            CreateDefaultHistory()
+
+        SaveHistory()
+
+        return
+
+    end
+
+
+    local Success, Data =
+        pcall(
+            function()
+
+                return
+                    HttpService:JSONDecode(
+                        readfile(
+                            HISTORY_FILE
+                        )
+                    )
+
+            end
+        )
+
+
+    if Success
+        and type(Data) == "table" then
+
+        History = Data
+
+    else
+
+        History =
+            CreateDefaultHistory()
+
+    end
+
+
+    --==================================================
+    -- MIGRATION
+    --==================================================
+
+    for _, Username in ipairs(
+        TARGET_USERNAMES
+    ) do
+
+        if History[Username] == nil then
+
+            History[Username] = {
+
+                Status =
+                    "Belum kirim",
+
+                Value = 0
+
+            }
+
+        elseif
+            type(
+                History[Username]
+            ) == "string"
+        then
+
+            History[Username] = {
+
+                Status =
+                    History[Username],
+
+                Value = 0
+
+            }
+
+        end
+
+    end
+
+
+    SaveHistory()
+
+end
 
 
 --==================================================
@@ -193,9 +471,6 @@ local Main =
         "Frame"
     )
 
-Main.Name =
-    "Main"
-
 Main.Size =
     UDim2.new(
         0,
@@ -226,18 +501,37 @@ Main.Parent =
     ScreenGui
 
 
-local Corner =
+local MainCorner =
     Instance.new(
         "UICorner"
     )
 
-Corner.CornerRadius =
+MainCorner.CornerRadius =
     UDim.new(
         0,
         12
     )
 
-Corner.Parent =
+MainCorner.Parent =
+    Main
+
+
+local MainStroke =
+    Instance.new(
+        "UIStroke"
+    )
+
+MainStroke.Color =
+    Color3.fromRGB(
+        65,
+        65,
+        80
+    )
+
+MainStroke.Thickness =
+    1
+
+MainStroke.Parent =
     Main
 
 
@@ -247,49 +541,95 @@ Corner.Parent =
 
 local Header =
     Instance.new(
-        "TextLabel"
+        "Frame"
     )
-
-Header.Name =
-    "Header"
 
 Header.Size =
     UDim2.new(
         1,
-        -50,
+        0,
         0,
         50
     )
 
-Header.Position =
+Header.BackgroundColor3 =
+    Color3.fromRGB(
+        30,
+        30,
+        38
+    )
+
+Header.BorderSizePixel =
+    0
+
+Header.Parent =
+    Main
+
+
+local HeaderCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+HeaderCorner.CornerRadius =
+    UDim.new(
+        0,
+        12
+    )
+
+HeaderCorner.Parent =
+    Header
+
+
+--==================================================
+-- HEADER TITLE
+--==================================================
+
+local HeaderTitle =
+    Instance.new(
+        "TextLabel"
+    )
+
+HeaderTitle.Size =
+    UDim2.new(
+        1,
+        -100,
+        1,
+        0
+    )
+
+HeaderTitle.Position =
     UDim2.new(
         0,
-        0,
+        15,
         0,
         0
     )
 
-Header.BackgroundTransparency =
+HeaderTitle.BackgroundTransparency =
     1
 
-Header.Text =
+HeaderTitle.Text =
     "HARVEST + SELL + AUTO TRADE"
 
-Header.TextColor3 =
+HeaderTitle.TextColor3 =
     Color3.fromRGB(
         255,
         255,
         255
     )
 
-Header.Font =
+HeaderTitle.Font =
     Enum.Font.GothamBold
 
-Header.TextSize =
-    17
+HeaderTitle.TextSize =
+    15
 
-Header.Parent =
-    Main
+HeaderTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+HeaderTitle.Parent =
+    Header
 
 
 --==================================================
@@ -301,13 +641,10 @@ local MinimizeButton =
         "TextButton"
     )
 
-MinimizeButton.Name =
-    "MinimizeButton"
-
 MinimizeButton.Size =
     UDim2.new(
         0,
-        30,
+        35,
         0,
         30
     )
@@ -315,7 +652,7 @@ MinimizeButton.Size =
 MinimizeButton.Position =
     UDim2.new(
         1,
-        -40,
+        -45,
         0,
         10
     )
@@ -341,10 +678,10 @@ MinimizeButton.Font =
     Enum.Font.GothamBold
 
 MinimizeButton.TextSize =
-    18
+    16
 
 MinimizeButton.Parent =
-    Main
+    Header
 
 
 local MinimizeCorner =
@@ -355,7 +692,7 @@ local MinimizeCorner =
 MinimizeCorner.CornerRadius =
     UDim.new(
         0,
-        7
+        6
     )
 
 MinimizeCorner.Parent =
@@ -582,7 +919,7 @@ StepCorner.Parent =
 
 
 --==================================================
--- ADD PLAYER BUTTON
+-- ADD PLAYER
 --==================================================
 
 local AddButton =
@@ -649,7 +986,7 @@ AddCorner.Parent =
 
 
 --==================================================
--- REMOVE PLAYER BUTTON
+-- REMOVE PLAYER
 --==================================================
 
 local RemoveButton =
@@ -716,7 +1053,7 @@ RemoveCorner.Parent =
 
 
 --==================================================
--- TRADE HISTORY TITLE
+-- HISTORY TITLE
 --==================================================
 
 local HistoryTitle =
@@ -807,14 +1144,6 @@ HistoryScroll.ScrollBarThickness =
 HistoryScroll.AutomaticCanvasSize =
     Enum.AutomaticSize.Y
 
-HistoryScroll.CanvasSize =
-    UDim2.new(
-        0,
-        0,
-        0,
-        0
-    )
-
 HistoryScroll.Parent =
     Main
 
@@ -875,201 +1204,24 @@ HistoryPadding.PaddingRight =
         7
     )
 
-HistoryPadding.PaddingBottom =
-    UDim.new(
-        0,
-        7
-    )
-
 HistoryPadding.Parent =
     HistoryScroll
 
 
 --==================================================
--- SET STEP
+-- CURRENT STEP FUNCTION
 --==================================================
 
-local function SetStep(Text)
+local function SetStep(
+    Text
+)
 
     CurrentStep =
         Text
 
     StepLabel.Text =
-        "Current Step: " ..
-        Text
-
-end
-
-
---==================================================
--- FILE API
---==================================================
-
-local function IsFileAPIAvailable()
-
-    return isfile
-        and readfile
-        and writefile
-
-end
-
-
---==================================================
--- DEFAULT HISTORY
---==================================================
-
-local function CreateDefaultHistory()
-
-    local NewHistory = {}
-
-    for _, Username in ipairs(
-        TARGET_USERNAMES
-    ) do
-
-        NewHistory[Username] = {
-
-            Status =
-                "Belum kirim",
-
-            Value =
-                0
-
-        }
-
-    end
-
-    return NewHistory
-
-end
-
-
---==================================================
--- SAVE HISTORY
---==================================================
-
-local function SaveHistory()
-
-    if not IsFileAPIAvailable() then
-        return false
-    end
-
-    local Success =
-        pcall(
-            function()
-
-                writefile(
-                    HISTORY_FILE,
-                    HttpService:JSONEncode(
-                        History
-                    )
-                )
-
-            end
-        )
-
-    return Success
-
-end
-
-
---==================================================
--- LOAD HISTORY
---==================================================
-
-local function LoadHistory()
-
-    if not IsFileAPIAvailable() then
-
-        History =
-            CreateDefaultHistory()
-
-        return
-
-    end
-
-
-    if not isfile(
-        HISTORY_FILE
-    ) then
-
-        History =
-            CreateDefaultHistory()
-
-        SaveHistory()
-
-        return
-
-    end
-
-
-    local Success, Data =
-        pcall(
-            function()
-
-                return HttpService:JSONDecode(
-                    readfile(
-                        HISTORY_FILE
-                    )
-                )
-
-            end
-        )
-
-
-    if Success
-        and type(Data) == "table" then
-
-        History =
-            Data
-
-    else
-
-        History =
-            CreateDefaultHistory()
-
-    end
-
-
-    --==================================================
-    -- MIGRATION OLD FORMAT
-    --==================================================
-
-    for _, Username in ipairs(
-        TARGET_USERNAMES
-    ) do
-
-        if History[Username] == nil then
-
-            History[Username] = {
-
-                Status =
-                    "Belum kirim",
-
-                Value =
-                    0
-
-            }
-
-        elseif type(
-            History[Username]
-        ) == "string" then
-
-            History[Username] = {
-
-                Status =
-                    History[Username],
-
-                Value =
-                    0
-
-            }
-
-        end
-
-    end
-
-
-    SaveHistory()
+        "Current Step: "
+        .. Text
 
 end
 
@@ -1110,8 +1262,7 @@ local function RefreshHistoryGUI()
                 Status =
                     "Belum kirim",
 
-                Value =
-                    0
+                Value = 0
 
             }
 
@@ -1121,18 +1272,10 @@ local function RefreshHistoryGUI()
         end
 
 
-        --==================================================
-        -- ROW
-        --==================================================
-
         local Row =
             Instance.new(
                 "Frame"
             )
-
-        Row.Name =
-            "History_" ..
-            Username
 
         Row.Size =
             UDim2.new(
@@ -1173,10 +1316,6 @@ local function RefreshHistoryGUI()
         RowCorner.Parent =
             Row
 
-
-        --==================================================
-        -- USERNAME
-        --==================================================
 
         local NameLabel =
             Instance.new(
@@ -1225,10 +1364,6 @@ local function RefreshHistoryGUI()
             Row
 
 
-        --==================================================
-        -- STATUS
-        --==================================================
-
         local StatusLabel =
             Instance.new(
                 "TextLabel"
@@ -1255,29 +1390,21 @@ local function RefreshHistoryGUI()
 
         StatusLabel.Text =
             Data.Status
-            or
-            "Belum kirim"
+            or "Belum kirim"
 
-        if Data.Status ==
-            "Sudah kirim" then
-
-            StatusLabel.TextColor3 =
-                Color3.fromRGB(
-                    80,
-                    220,
-                    120
-                )
-
-        else
-
-            StatusLabel.TextColor3 =
-                Color3.fromRGB(
-                    255,
-                    190,
-                    70
-                )
-
-        end
+        StatusLabel.TextColor3 =
+            Data.Status
+            == "Sudah kirim"
+            and Color3.fromRGB(
+                80,
+                220,
+                120
+            )
+            or Color3.fromRGB(
+                255,
+                190,
+                70
+            )
 
         StatusLabel.Font =
             Enum.Font.Gotham
@@ -1291,10 +1418,6 @@ local function RefreshHistoryGUI()
         StatusLabel.Parent =
             Row
 
-
-        --==================================================
-        -- VALUE
-        --==================================================
 
         local ValueLabel =
             Instance.new(
@@ -1325,8 +1448,7 @@ local function RefreshHistoryGUI()
             tonumber(
                 Data.Value
             )
-            or
-            0
+            or 0
 
 
         local ValueText
@@ -1338,9 +1460,10 @@ local function RefreshHistoryGUI()
                 pcall(
                     function()
 
-                        return NumberUtils.Abbreviate(
-                            Value
-                        )
+                        return
+                            NumberUtils.Abbreviate(
+                                Value
+                            )
 
                     end
                 )
@@ -1371,8 +1494,8 @@ local function RefreshHistoryGUI()
 
 
         ValueLabel.Text =
-            "Value: " ..
-            ValueText
+            "Value: "
+            .. ValueText
 
         ValueLabel.TextColor3 =
             Color3.fromRGB(
@@ -1425,8 +1548,8 @@ local function AddPlayer(
     ) do
 
         if Existing:lower()
-            ==
-            Username:lower() then
+            == Username:lower()
+        then
 
             return
 
@@ -1446,11 +1569,12 @@ local function AddPlayer(
         Status =
             "Belum kirim",
 
-        Value =
-            0
+        Value = 0
 
     }
 
+
+    SavePlayers()
 
     SaveHistory()
 
@@ -1460,63 +1584,18 @@ end
 
 
 --==================================================
--- REMOVE PLAYER
+-- INPUT WINDOW
 --==================================================
 
-local function RemovePlayer(
-    Username
+local function CreateInputWindow(
+    TitleText,
+    Callback
 )
-
-    if not Username
-        or Username == "" then
-
-        return
-
-    end
-
-
-    for Index, Existing in ipairs(
-        TARGET_USERNAMES
-    ) do
-
-        if Existing:lower()
-            ==
-            Username:lower() then
-
-            table.remove(
-                TARGET_USERNAMES,
-                Index
-            )
-
-            History[Existing] =
-                nil
-
-            SaveHistory()
-
-            RefreshHistoryGUI()
-
-            return
-
-        end
-
-    end
-
-end
-
-
---==================================================
--- ADD PLAYER INPUT WINDOW
---==================================================
-
-local function CreateAddPlayerWindow()
 
     local Overlay =
         Instance.new(
             "Frame"
         )
-
-    Overlay.Name =
-        "AddPlayerOverlay"
 
     Overlay.Size =
         UDim2.new(
@@ -1542,10 +1621,6 @@ local function CreateAddPlayerWindow()
     Overlay.Parent =
         Main
 
-
-    --==================================================
-    -- BOX
-    --==================================================
 
     local Box =
         Instance.new(
@@ -1575,9 +1650,6 @@ local function CreateAddPlayerWindow()
             45
         )
 
-    Box.BorderSizePixel =
-        0
-
     Box.ZIndex =
         21
 
@@ -1599,10 +1671,6 @@ local function CreateAddPlayerWindow()
     BoxCorner.Parent =
         Box
 
-
-    --==================================================
-    -- TITLE
-    --==================================================
 
     local Title =
         Instance.new(
@@ -1629,7 +1697,7 @@ local function CreateAddPlayerWindow()
         1
 
     Title.Text =
-        "ADD PLAYER"
+        TitleText
 
     Title.TextColor3 =
         Color3.fromRGB(
@@ -1650,10 +1718,6 @@ local function CreateAddPlayerWindow()
     Title.Parent =
         Box
 
-
-    --==================================================
-    -- INPUT
-    --==================================================
 
     local Input =
         Instance.new(
@@ -1709,10 +1773,6 @@ local function CreateAddPlayerWindow()
         Box
 
 
-    --==================================================
-    -- CONFIRM
-    --==================================================
-
     local Confirm =
         Instance.new(
             "TextButton"
@@ -1763,10 +1823,6 @@ local function CreateAddPlayerWindow()
     Confirm.Parent =
         Box
 
-
-    --==================================================
-    -- CANCEL
-    --==================================================
 
     local Cancel =
         Instance.new(
@@ -1819,23 +1875,21 @@ local function CreateAddPlayerWindow()
         Box
 
 
-    --==================================================
-    -- EVENTS
-    --==================================================
-
     Confirm.MouseButton1Click:Connect(
         function()
 
             local Username =
                 Input.Text
 
+
             if Username ~= "" then
 
-                AddPlayer(
+                Callback(
                     Username
                 )
 
             end
+
 
             Overlay:Destroy()
 
@@ -1893,10 +1947,6 @@ local function CreateRemovePlayerWindow()
         Main
 
 
-    --==================================================
-    -- BOX
-    --==================================================
-
     local Box =
         Instance.new(
             "Frame"
@@ -1953,10 +2003,6 @@ local function CreateRemovePlayerWindow()
         Box
 
 
-    --==================================================
-    -- TITLE
-    --==================================================
-
     local Title =
         Instance.new(
             "TextLabel"
@@ -2004,10 +2050,6 @@ local function CreateRemovePlayerWindow()
         Box
 
 
-    --==================================================
-    -- SUBTITLE
-    --==================================================
-
     local Subtitle =
         Instance.new(
             "TextLabel"
@@ -2054,10 +2096,6 @@ local function CreateRemovePlayerWindow()
     Subtitle.Parent =
         Box
 
-
-    --==================================================
-    -- PLAYER LIST
-    --==================================================
 
     local PlayerList =
         Instance.new(
@@ -2173,210 +2211,265 @@ local function CreateRemovePlayerWindow()
 
 
     --==================================================
-    -- CREATE PLAYER ROW
+    -- PLAYER LIST
     --==================================================
 
-    for Index, Username in ipairs(
-        TARGET_USERNAMES
-    ) do
+    if #TARGET_USERNAMES == 0 then
 
-        local PlayerRow =
-            Instance.new(
-                "Frame"
-            )
-
-        PlayerRow.Name =
-            "Player_" ..
-            Username
-
-        PlayerRow.Size =
-            UDim2.new(
-                1,
-                -5,
-                0,
-                38
-            )
-
-        PlayerRow.BackgroundColor3 =
-            Color3.fromRGB(
-                42,
-                42,
-                52
-            )
-
-        PlayerRow.BorderSizePixel =
-            0
-
-        PlayerRow.LayoutOrder =
-            Index
-
-        PlayerRow.ZIndex =
-            23
-
-        PlayerRow.Parent =
-            PlayerList
-
-
-        local RowCorner =
-            Instance.new(
-                "UICorner"
-            )
-
-        RowCorner.CornerRadius =
-            UDim.new(
-                0,
-                6
-            )
-
-        RowCorner.Parent =
-            PlayerRow
-
-
-        --==================================================
-        -- NAME
-        --==================================================
-
-        local NameLabel =
+        local EmptyLabel =
             Instance.new(
                 "TextLabel"
             )
 
-        NameLabel.Size =
+        EmptyLabel.Size =
             UDim2.new(
                 1,
-                -85,
-                1,
-                0
+                0,
+                0,
+                40
             )
 
-        NameLabel.Position =
-            UDim2.new(
-                0,
-                10,
-                0,
-                0
-            )
-
-        NameLabel.BackgroundTransparency =
+        EmptyLabel.BackgroundTransparency =
             1
 
-        NameLabel.Text =
-            Username
+        EmptyLabel.Text =
+            "No players registered"
 
-        NameLabel.TextColor3 =
-            Color3.fromRGB(
-                255,
-                255,
-                255
-            )
-
-        NameLabel.Font =
-            Enum.Font.GothamBold
-
-        NameLabel.TextSize =
-            12
-
-        NameLabel.TextXAlignment =
-            Enum.TextXAlignment.Left
-
-        NameLabel.ZIndex =
-            24
-
-        NameLabel.Parent =
-            PlayerRow
-
-
-        --==================================================
-        -- REMOVE BUTTON
-        --==================================================
-
-        local RemovePlayerButton =
-            Instance.new(
-                "TextButton"
-            )
-
-        RemovePlayerButton.Size =
-            UDim2.new(
-                0,
-                65,
-                0,
-                28
-            )
-
-        RemovePlayerButton.Position =
-            UDim2.new(
-                1,
-                -72,
-                0.5,
-                -14
-            )
-
-        RemovePlayerButton.BackgroundColor3 =
+        EmptyLabel.TextColor3 =
             Color3.fromRGB(
                 150,
-                60,
-                60
+                150,
+                165
             )
 
-        RemovePlayerButton.Text =
-            "REMOVE"
+        EmptyLabel.Font =
+            Enum.Font.Gotham
 
-        RemovePlayerButton.TextColor3 =
-            Color3.fromRGB(
-                255,
-                255,
-                255
-            )
+        EmptyLabel.TextSize =
+            12
 
-        RemovePlayerButton.Font =
-            Enum.Font.GothamBold
+        EmptyLabel.ZIndex =
+            23
 
-        RemovePlayerButton.TextSize =
-            9
+        EmptyLabel.Parent =
+            PlayerList
 
-        RemovePlayerButton.ZIndex =
-            24
+    else
 
-        RemovePlayerButton.Parent =
-            PlayerRow
+        for Index, Username in ipairs(
+            TARGET_USERNAMES
+        ) do
 
-
-        local RemoveButtonCorner =
-            Instance.new(
-                "UICorner"
-            )
-
-        RemoveButtonCorner.CornerRadius =
-            UDim.new(
-                0,
-                5
-            )
-
-        RemoveButtonCorner.Parent =
-            RemovePlayerButton
-
-
-        --==================================================
-        -- REMOVE EVENT
-        --==================================================
-
-        RemovePlayerButton.MouseButton1Click:Connect(
-            function()
-
-                RemovePlayer(
-                    Username
+            local PlayerRow =
+                Instance.new(
+                    "Frame"
                 )
 
-                Overlay:Destroy()
+            PlayerRow.Name =
+                "Player_" .. Username
 
-            end
-        )
+            PlayerRow.Size =
+                UDim2.new(
+                    1,
+                    -5,
+                    0,
+                    38
+                )
+
+            PlayerRow.BackgroundColor3 =
+                Color3.fromRGB(
+                    42,
+                    42,
+                    52
+                )
+
+            PlayerRow.BorderSizePixel =
+                0
+
+            PlayerRow.LayoutOrder =
+                Index
+
+            PlayerRow.ZIndex =
+                23
+
+            PlayerRow.Parent =
+                PlayerList
+
+
+            local RowCorner =
+                Instance.new(
+                    "UICorner"
+                )
+
+            RowCorner.CornerRadius =
+                UDim.new(
+                    0,
+                    6
+                )
+
+            RowCorner.Parent =
+                PlayerRow
+
+
+            local NameLabel =
+                Instance.new(
+                    "TextLabel"
+                )
+
+            NameLabel.Size =
+                UDim2.new(
+                    1,
+                    -85,
+                    1,
+                    0
+                )
+
+            NameLabel.Position =
+                UDim2.new(
+                    0,
+                    10,
+                    0,
+                    0
+                )
+
+            NameLabel.BackgroundTransparency =
+                1
+
+            NameLabel.Text =
+                Username
+
+            NameLabel.TextColor3 =
+                Color3.fromRGB(
+                    255,
+                    255,
+                    255
+                )
+
+            NameLabel.Font =
+                Enum.Font.GothamBold
+
+            NameLabel.TextSize =
+                12
+
+            NameLabel.TextXAlignment =
+                Enum.TextXAlignment.Left
+
+            NameLabel.ZIndex =
+                24
+
+            NameLabel.Parent =
+                PlayerRow
+
+
+            local RemovePlayerButton =
+                Instance.new(
+                    "TextButton"
+                )
+
+            RemovePlayerButton.Size =
+                UDim2.new(
+                    0,
+                    65,
+                    0,
+                    28
+                )
+
+            RemovePlayerButton.Position =
+                UDim2.new(
+                    1,
+                    -72,
+                    0.5,
+                    -14
+                )
+
+            RemovePlayerButton.BackgroundColor3 =
+                Color3.fromRGB(
+                    150,
+                    60,
+                    60
+                )
+
+            RemovePlayerButton.Text =
+                "REMOVE"
+
+            RemovePlayerButton.TextColor3 =
+                Color3.fromRGB(
+                    255,
+                    255,
+                    255
+                )
+
+            RemovePlayerButton.Font =
+                Enum.Font.GothamBold
+
+            RemovePlayerButton.TextSize =
+                9
+
+            RemovePlayerButton.ZIndex =
+                24
+
+            RemovePlayerButton.Parent =
+                PlayerRow
+
+
+            local RemoveButtonCorner =
+                Instance.new(
+                    "UICorner"
+                )
+
+            RemoveButtonCorner.CornerRadius =
+                UDim.new(
+                    0,
+                    5
+                )
+
+            RemoveButtonCorner.Parent =
+                RemovePlayerButton
+
+
+            RemovePlayerButton.MouseButton1Click:Connect(
+                function()
+
+                    for PlayerIndex, Existing in ipairs(
+                        TARGET_USERNAMES
+                    ) do
+
+                        if Existing == Username then
+
+                            table.remove(
+                                TARGET_USERNAMES,
+                                PlayerIndex
+                            )
+
+                            break
+
+                        end
+
+                    end
+
+
+                    History[Username] =
+                        nil
+
+
+                    SavePlayers()
+
+                    SaveHistory()
+
+                    RefreshHistoryGUI()
+
+                    Overlay:Destroy()
+
+                end
+            )
+
+        end
 
     end
 
 
     --==================================================
-    -- CLOSE BUTTON
+    -- CLOSE
     --==================================================
 
     local Cancel =
@@ -2457,13 +2550,64 @@ end
 
 
 --==================================================
+-- MINIMIZE / RESTORE
+--==================================================
+
+local FullSize =
+    UDim2.new(
+        0,
+        430,
+        0,
+        520
+    )
+
+local MiniSize =
+    UDim2.new(
+        0,
+        430,
+        0,
+        50
+    )
+
+
+MinimizeButton.MouseButton1Click:Connect(
+    function()
+
+        IsMinimized =
+            not IsMinimized
+
+
+        if IsMinimized then
+
+            Main.Size =
+                MiniSize
+
+            MinimizeButton.Text =
+                "+"
+
+        else
+
+            Main.Size =
+                FullSize
+
+            MinimizeButton.Text =
+                "—"
+
+        end
+
+    end
+)
+
+
+--==================================================
 -- BUTTON EVENTS
 --==================================================
 
 StartButton.MouseButton1Click:Connect(
     function()
 
-        Running = true
+        Running =
+            true
 
         SetStep(
             "Running..."
@@ -2476,7 +2620,8 @@ StartButton.MouseButton1Click:Connect(
 StopButton.MouseButton1Click:Connect(
     function()
 
-        Running = false
+        Running =
+            false
 
         SetStep(
             "STOPPED"
@@ -2489,7 +2634,18 @@ StopButton.MouseButton1Click:Connect(
 AddButton.MouseButton1Click:Connect(
     function()
 
-        CreateAddPlayerWindow()
+        CreateInputWindow(
+            "ADD PLAYER",
+            function(
+                Username
+            )
+
+                AddPlayer(
+                    Username
+                )
+
+            end
+        )
 
     end
 )
@@ -2505,8 +2661,10 @@ RemoveButton.MouseButton1Click:Connect(
 
 
 --==================================================
--- LOAD HISTORY
+-- LOAD DATA
 --==================================================
+
+LoadPlayers()
 
 LoadHistory()
 
@@ -2526,18 +2684,20 @@ local function GetMyPlot()
                 "Plot" .. i
             )
 
+
         if Plot
             and Plot:GetAttribute(
                 "Owner"
             )
-            ==
-            LocalPlayer.Name then
+            == LocalPlayer.Name
+        then
 
             return Plot
 
         end
 
     end
+
 
     return nil
 
@@ -2553,10 +2713,9 @@ local function HarvestFruits()
     local MyPlot =
         GetMyPlot()
 
+
     if not MyPlot then
-
         return 0
-
     end
 
 
@@ -2565,10 +2724,9 @@ local function HarvestFruits()
             "Plants"
         )
 
+
     if not Plants then
-
         return 0
-
     end
 
 
@@ -2602,7 +2760,8 @@ local function HarvestFruits()
             if Prompt
                 and Prompt:IsA(
                     "ProximityPrompt"
-                ) then
+                )
+            then
 
                 pcall(
                     function()
@@ -2613,6 +2772,7 @@ local function HarvestFruits()
 
                     end
                 )
+
 
                 Harvested += 1
 
@@ -2645,8 +2805,7 @@ local function HarvestFruits()
                     Fruit:GetAttribute(
                         "SizeMulti"
                     )
-                    or
-                    1
+                    or 1
 
 
                 local Mutation =
@@ -2655,9 +2814,10 @@ local function HarvestFruits()
                     )
 
 
-                if SizeMulti >
-                    SIZE_THRESHOLD
-                    and not Mutation then
+                if SizeMulti
+                    > SIZE_THRESHOLD
+                    and not Mutation
+                then
 
                     continue
 
@@ -2696,7 +2856,8 @@ local function HarvestFruits()
                     if Prompt
                         and Prompt:IsA(
                             "ProximityPrompt"
-                        ) then
+                        )
+                    then
 
                         pcall(
                             function()
@@ -2707,6 +2868,7 @@ local function HarvestFruits()
 
                             end
                         )
+
 
                         Harvested += 1
 
@@ -2763,23 +2925,17 @@ local function FavoriteBigFruits()
 
         if FruitId
             and SizeMultiplier
-            and SizeMultiplier >
-                SIZE_MULTIPLIER_LIMIT then
+            and SizeMultiplier
+                > SIZE_MULTIPLIER_LIMIT
+        then
 
-
-            pcall(
-                function()
-
-                    Networking
-                        .Backpack
-                        .SetFruitFavorite
-                        :Fire(
-                            FruitId,
-                            true
-                        )
-
-                end
-            )
+            Networking
+                .Backpack
+                .SetFruitFavorite
+                :Fire(
+                    FruitId,
+                    true
+                )
 
 
             FavoritedFruits[
@@ -2811,16 +2967,10 @@ end
 
 local function SellAll()
 
-    pcall(
-        function()
-
-            Networking
-                .NPCS
-                .PreviewSellAll
-                :Fire()
-
-        end
-    )
+    Networking
+        .NPCS
+        .PreviewSellAll
+        :Fire()
 
 
     task.wait(
@@ -2828,16 +2978,10 @@ local function SellAll()
     )
 
 
-    pcall(
-        function()
-
-            Networking
-                .NPCS
-                .SellAll
-                :Fire()
-
-        end
-    )
+    Networking
+        .NPCS
+        .SellAll
+        :Fire()
 
 end
 
@@ -2856,19 +3000,13 @@ local function UnfavoriteBigFruits()
         FavoritedFruits
     ) do
 
-        pcall(
-            function()
-
-                Networking
-                    .Backpack
-                    .SetFruitFavorite
-                    :Fire(
-                        FruitId,
-                        false
-                    )
-
-            end
-        )
+        Networking
+            .Backpack
+            .SetFruitFavorite
+            :Fire(
+                FruitId,
+                false
+            )
 
 
         Count += 1
@@ -2911,7 +3049,6 @@ local function BuildBatch()
         Backpack:GetChildren()
     ) do
 
-
         if Item:IsA(
             "Tool"
         )
@@ -2928,59 +3065,44 @@ local function BuildBatch()
 
             if FruitName then
 
-
                 local Success, Value =
                     pcall(
                         function()
 
-                            return FruitValueCalc(
-                                FruitName,
-
-                                Item:GetAttribute(
-                                    "SizeMultiplier"
-                                ),
-
-                                Item:GetAttribute(
-                                    "Mutation"
-                                ),
-
-                                LocalPlayer,
-
-                                Item:GetAttribute(
-                                    "DecayAlpha"
+                            return
+                                FruitValueCalc(
+                                    FruitName,
+                                    Item:GetAttribute(
+                                        "SizeMultiplier"
+                                    ),
+                                    Item:GetAttribute(
+                                        "Mutation"
+                                    ),
+                                    LocalPlayer,
+                                    Item:GetAttribute(
+                                        "DecayAlpha"
+                                    )
                                 )
-
-                            )
 
                         end
                     )
 
 
                 if Success
-                    and Value then
-
+                    and Value
+                then
 
                     local FruitId =
-
                         Item:GetAttribute(
                             "FruitId"
                         )
-
-                        or
-
-                        Item:GetAttribute(
+                        or Item:GetAttribute(
                             "ItemId"
                         )
-
-                        or
-
-                        Item:GetAttribute(
+                        or Item:GetAttribute(
                             "UUID"
                         )
-
-                        or
-
-                        Item:GetAttribute(
+                        or Item:GetAttribute(
                             "Id"
                         )
 
@@ -3016,14 +3138,14 @@ local function BuildBatch()
 
     table.sort(
         Fruits,
-
         function(
             A,
             B
         )
 
-            return A.Value >
-                B.Value
+            return
+                A.Value
+                > B.Value
 
         end
     )
@@ -3033,17 +3155,18 @@ local function BuildBatch()
         Fruits
     ) do
 
-
-        if #Batch >=
-            MAX_FRUIT_SEND then
+        if #Batch
+            >= MAX_FRUIT_SEND
+        then
 
             break
 
         end
 
 
-        if TotalValue >=
-            TARGET_VALUE then
+        if TotalValue
+            >= TARGET_VALUE
+        then
 
             break
 
@@ -3052,7 +3175,6 @@ local function BuildBatch()
 
         table.insert(
             Batch,
-
             {
 
                 Category =
@@ -3074,7 +3196,8 @@ local function BuildBatch()
     end
 
 
-    return Batch,
+    return
+        Batch,
         TotalValue
 
 end
@@ -3091,14 +3214,13 @@ local function GetNextTarget()
     ) do
 
         local Data =
-            History[
-                Username
-            ]
+            History[Username]
 
 
         if not Data
-            or Data.Status ~=
-                "Sudah kirim" then
+            or Data.Status
+                ~= "Sudah kirim"
+        then
 
             return Username
 
@@ -3122,9 +3244,7 @@ local function ResetHistory()
         TARGET_USERNAMES
     ) do
 
-        History[
-            Username
-        ] = {
+        History[Username] = {
 
             Status =
                 "Belum kirim",
@@ -3153,27 +3273,28 @@ local function SendToTarget(
 )
 
     SetStep(
-        "Getting UserId: " ..
-        TargetUsername
+        "Getting UserId: "
+        .. TargetUsername
     )
 
 
     local SuccessUserId,
         TargetUserId =
-
         pcall(
             function()
 
-                return Players:GetUserIdFromNameAsync(
-                    TargetUsername
-                )
+                return
+                    Players:GetUserIdFromNameAsync(
+                        TargetUsername
+                    )
 
             end
         )
 
 
     if not SuccessUserId
-        or not TargetUserId then
+        or not TargetUserId
+    then
 
         return false
 
@@ -3187,7 +3308,6 @@ local function SendToTarget(
 
     local Batch,
         TotalValue =
-
         BuildBatch()
 
 
@@ -3199,20 +3319,14 @@ local function SendToTarget(
 
 
     SetStep(
-
-        "Sending " ..
-
-        #Batch ..
-
-        " Fruit -> " ..
-
-        TargetUsername
-
+        "Sending "
+        .. #Batch
+        .. " Fruit -> "
+        .. TargetUsername
     )
 
 
     local SuccessSend =
-
         pcall(
             function()
 
@@ -3220,13 +3334,9 @@ local function SendToTarget(
                     .Mailbox
                     .SendBatch
                     :Fire(
-
                         TargetUserId,
-
                         Batch,
-
                         NOTE
-
                     )
 
             end
@@ -3241,7 +3351,7 @@ local function SendToTarget(
 
 
     --==================================================
-    -- SAVE TRADE HISTORY
+    -- SAVE TRADE VALUE
     --==================================================
 
     History[
@@ -3306,11 +3416,8 @@ local function RunAutoSend()
 
 
     SetStep(
-
-        "Checking Fruit -> " ..
-
-        TargetUsername
-
+        "Checking Fruit -> "
+        .. TargetUsername
     )
 
 
@@ -3322,14 +3429,12 @@ local function RunAutoSend()
         Backpack:GetChildren()
     ) do
 
-
         if Item:IsA(
             "Tool"
         )
         or Item:IsA(
             "Configuration"
         ) then
-
 
             if Item:GetAttribute(
                 "FruitName"
@@ -3344,19 +3449,15 @@ local function RunAutoSend()
     end
 
 
-    if FruitCount <
-        MAX_FRUIT_SEND then
+    if FruitCount
+        < MAX_FRUIT_SEND
+    then
 
         SetStep(
-
-            "Waiting Fruit: " ..
-
-            FruitCount ..
-
-            "/" ..
-
-            MAX_FRUIT_SEND
-
+            "Waiting Fruit: "
+            .. FruitCount
+            .. "/"
+            .. MAX_FRUIT_SEND
         )
 
 
@@ -3428,16 +3529,14 @@ task.spawn(
             )
 
 
-            if not Running then
-
-                continue
-
-            end
-
-
             --==================================================
             -- STEP 2
             --==================================================
+
+            if not Running then
+                continue
+            end
+
 
             SetStep(
                 "2/5 Favorite Big Fruits"
@@ -3453,16 +3552,14 @@ task.spawn(
             )
 
 
-            if not Running then
-
-                continue
-
-            end
-
-
             --==================================================
             -- STEP 3
             --==================================================
+
+            if not Running then
+                continue
+            end
+
 
             SetStep(
                 "3/5 Sell All"
@@ -3477,16 +3574,14 @@ task.spawn(
             )
 
 
-            if not Running then
-
-                continue
-
-            end
-
-
             --==================================================
             -- STEP 4
             --==================================================
+
+            if not Running then
+                continue
+            end
+
 
             SetStep(
                 "4/5 Unfavorite"
@@ -3496,16 +3591,14 @@ task.spawn(
             UnfavoriteBigFruits()
 
 
-            if not Running then
-
-                continue
-
-            end
-
-
             --==================================================
             -- STEP 5
             --==================================================
+
+            if not Running then
+                continue
+            end
+
 
             SetStep(
                 "5/5 Auto Send"
@@ -3516,19 +3609,14 @@ task.spawn(
 
 
             --==================================================
-            -- CYCLE COMPLETE
+            -- CYCLE FINISH
             --==================================================
 
             SetStep(
-
-                "Cycle Complete | Harvest: " ..
-
-                HarvestedCount ..
-
-                " | Favorite: " ..
-
-                FavoritedCount
-
+                "Cycle Complete | Harvest: "
+                .. HarvestedCount
+                .. " | Favorite: "
+                .. FavoritedCount
             )
 
 
@@ -3543,110 +3631,7 @@ task.spawn(
 
 
 --==================================================
--- MINIMIZE / MAXIMIZE
---==================================================
-
-local Minimized =
-    false
-
-
-local MainChildren = {
-
-    StartButton,
-
-    StopButton,
-
-    StepLabel,
-
-    AddButton,
-
-    RemoveButton,
-
-    HistoryTitle,
-
-    HistoryScroll
-
-}
-
-
-local function SetMinimized(
-    State
-)
-
-    Minimized =
-        State
-
-
-    if Minimized then
-
-
-        Main.Size =
-            UDim2.new(
-                0,
-                430,
-                0,
-                50
-            )
-
-
-        for _, Object in ipairs(
-            MainChildren
-        ) do
-
-            Object.Visible =
-                false
-
-        end
-
-
-        MinimizeButton.Text =
-            "+"
-
-
-    else
-
-
-        Main.Size =
-            UDim2.new(
-                0,
-                430,
-                0,
-                520
-            )
-
-
-        for _, Object in ipairs(
-            MainChildren
-        ) do
-
-            Object.Visible =
-                true
-
-        end
-
-
-        MinimizeButton.Text =
-            "—"
-
-
-    end
-
-end
-
-
-MinimizeButton.MouseButton1Click:Connect(
-    function()
-
-        SetMinimized(
-            not Minimized
-        )
-
-    end
-)
-
-
---==================================================
--- DRAG SYSTEM
+-- DRAG GUI
 --==================================================
 
 local Dragging =
@@ -3662,37 +3647,18 @@ Header.InputBegan:Connect(
         Input
     )
 
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
-
+        if Input.UserInputType
+            == Enum.UserInputType.MouseButton1
+        then
 
             Dragging =
                 true
 
-
             DragStart =
                 Input.Position
 
-
             StartPosition =
                 Main.Position
-
-        end
-
-    end
-)
-
-
-Header.InputEnded:Connect(
-    function(
-        Input
-    )
-
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
-
-            Dragging =
-                false
 
         end
 
@@ -3706,14 +3672,13 @@ UserInputService.InputChanged:Connect(
     )
 
         if not Dragging then
-
             return
-
         end
 
 
-        if Input.UserInputType ~=
-            Enum.UserInputType.MouseMovement then
+        if Input.UserInputType
+            ~= Enum.UserInputType.MouseMovement
+        then
 
             return
 
@@ -3721,8 +3686,8 @@ UserInputService.InputChanged:Connect(
 
 
         local Delta =
-            Input.Position -
-            DragStart
+            Input.Position
+            - DragStart
 
 
         Main.Position =
@@ -3730,13 +3695,13 @@ UserInputService.InputChanged:Connect(
 
                 StartPosition.X.Scale,
 
-                StartPosition.X.Offset +
-                    Delta.X,
+                StartPosition.X.Offset
+                + Delta.X,
 
                 StartPosition.Y.Scale,
 
-                StartPosition.Y.Offset +
-                    Delta.Y
+                StartPosition.Y.Offset
+                + Delta.Y
 
             )
 
@@ -3744,8 +3709,19 @@ UserInputService.InputChanged:Connect(
 )
 
 
---==================================================
--- INITIAL UPDATE
---==================================================
+UserInputService.InputEnded:Connect(
+    function(
+        Input
+    )
 
-RefreshHistoryGUI()
+        if Input.UserInputType
+            == Enum.UserInputType.MouseButton1
+        then
+
+            Dragging =
+                false
+
+        end
+
+    end
+)
