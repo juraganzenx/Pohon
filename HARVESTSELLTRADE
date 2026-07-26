@@ -130,23 +130,9 @@ local NOTE =
 
 local TARGET_USERNAMES = {
 
-    "SD214A",
+    "1",
 
-    "FLK41H",
-
-    "GK3AV2",
-
-    "ZW3P11",
-
-    "3H42ED",
-
-    "ADGD2D",
-
-    "ADG2DA",
-
-    "GD4G32",
-
-    "34LA72"
+    "2"
 
 }
 
