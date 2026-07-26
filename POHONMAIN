@@ -11,7 +11,7 @@ local function Execute(url)
 end
 
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/DESTROYPLANT")
-Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/HARVEST")
+Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/HARVESTSELLTRADE")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/PLANT")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/SSDANSWC")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/TWEENTOFRONT")
