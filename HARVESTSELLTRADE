@@ -93,23 +93,9 @@ local NOTE =
 
 local DEFAULT_USERNAMES = {
 
-    "SD214A",
+    "P1",
 
-    "FLK41H",
-
-    "GK3AV2",
-
-    "ZW3P11",
-
-    "3H42ED",
-
-    "ADGD2D",
-
-    "ADG2DA",
-
-    "GD4G32",
-
-    "34LA72"
+    "P2"
 
 }
 
