@@ -1,0 +1,1140 @@
+-- HARVEST + SELL FRUIT LOOP
+-- URUTAN:
+-- 1. HARVEST
+-- 2. FAVORITE FRUIT SizeMultiplier > 8
+-- 3. SELL ALL
+-- 4. UNFAVORITE KEMBALI
+-- 5. ULANGI TERUS
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+local Gardens = workspace:WaitForChild("Gardens")
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+-- SELL
+local SIZE_MULTIPLIER_LIMIT = 8
+
+local FAVORITE_DELAY = 0.05
+local BEFORE_SELL_DELAY = 1
+local AFTER_SELL_DELAY = 1
+local UNFAVORITE_DELAY = 0.05
+
+-- Jeda setelah harvest selesai
+local AFTER_HARVEST_DELAY = 1
+
+-- Jeda sebelum siklus berikutnya
+local LOOP_DELAY = 2
+
+-- HARVEST
+local SIZE_THRESHOLD = 8
+
+-- Blacklist Fruit berdasarkan CorePartName
+local BLACKLIST = {
+    NAMEFRUIT = true,
+}
+
+--------------------------------------------------
+-- DAFTAR FRUIT YANG DI-FAVORITE
+-- PADA SIKLUS SAAT INI
+--------------------------------------------------
+
+local FavoritedFruits = {}
+
+--------------------------------------------------
+-- CARI PLOT MILIK PLAYER
+--------------------------------------------------
+
+local function GetMyPlot()
+
+    for i = 1, 8 do
+
+        local Plot = Gardens:FindFirstChild("Plot" .. i)
+
+        if Plot and Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            return Plot
+        end
+
+    end
+
+    return nil
+end
+
+--------------------------------------------------
+-- HARVEST SEMUA YANG MEMENUHI SYARAT
+--------------------------------------------------
+
+local function HarvestFruits()
+
+    local MyPlot = GetMyPlot()
+
+    if not MyPlot then
+        warn("❌ Plot milikmu tidak ditemukan!")
+        return 0
+    end
+
+    local Plants = MyPlot:FindFirstChild("Plants")
+
+    if not Plants then
+        warn("❌ Folder Plants tidak ditemukan!")
+        return 0
+    end
+
+    local harvested = 0
+    local plantCount = 0
+
+    for _, Plant in ipairs(Plants:GetChildren()) do
+
+        plantCount += 1
+
+        --------------------------------------------------
+        -- HARVEST PLANT
+        --------------------------------------------------
+
+        local HarvestPart = Plant:FindFirstChild("HarvestPart")
+
+        if HarvestPart then
+
+            local HarvestPrompt = HarvestPart:FindFirstChild("HarvestPrompt")
+
+            if HarvestPrompt
+                and HarvestPrompt:IsA("ProximityPrompt")
+            then
+
+                pcall(function()
+                    fireproximityprompt(HarvestPrompt)
+                end)
+
+                harvested += 1
+
+                task.wait(0.001)
+
+            end
+
+        end
+
+        --------------------------------------------------
+        -- HARVEST FRUITS
+        --------------------------------------------------
+
+        local Fruits = Plant:FindFirstChild("Fruits")
+
+        if Fruits then
+
+            for _, Fruit in ipairs(Fruits:GetChildren()) do
+
+                --------------------------------------------------
+                -- CEK SIZE MULTI
+                --------------------------------------------------
+
+                local SizeMulti = Fruit:GetAttribute("SizeMulti") or 1
+
+                --------------------------------------------------
+                -- CEK MUTATION
+                --------------------------------------------------
+
+                local Mutation = Fruit:GetAttribute("Mutation")
+
+                -- Buah SizeMulti > 8 harus menunggu Mutation
+                if SizeMulti > SIZE_THRESHOLD and not Mutation then
+                    continue
+                end
+
+                --------------------------------------------------
+                -- BLACKLIST
+                --------------------------------------------------
+
+                local CorePartName = Fruit:GetAttribute("CorePartName")
+
+                if BLACKLIST[CorePartName] then
+                    continue
+                end
+
+                --------------------------------------------------
+                -- HARVEST
+                --------------------------------------------------
+
+                local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
+
+                if FruitHarvestPart then
+
+                    local FruitPrompt =
+                        FruitHarvestPart:FindFirstChild("HarvestPrompt")
+
+                    if FruitPrompt
+                        and FruitPrompt:IsA("ProximityPrompt")
+                    then
+
+                        pcall(function()
+                            fireproximityprompt(FruitPrompt)
+                        end)
+
+                        harvested += 1
+
+                        task.wait(0.001)
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    print(string.format(
+        "🌱 [%s] Harvest selesai | Plants: %d | Total Harvest: %d",
+        MyPlot.Name,
+        plantCount,
+        harvested
+    ))
+
+    return harvested
+end
+
+--------------------------------------------------
+-- FAVORITE SEMUA FRUIT
+-- SizeMultiplier > 8
+--------------------------------------------------
+
+local function FavoriteBigFruits()
+
+    local count = 0
+
+    -- Bersihkan daftar dari siklus sebelumnya
+    table.clear(FavoritedFruits)
+
+    --------------------------------------------------
+    -- SCAN BACKPACK
+    --------------------------------------------------
+
+    for _, Fruit in ipairs(Backpack:GetChildren()) do
+
+        local FruitId = Fruit:GetAttribute("Id")
+        local SizeMultiplier = Fruit:GetAttribute("SizeMultiplier")
+
+        if FruitId
+            and SizeMultiplier
+            and SizeMultiplier > SIZE_MULTIPLIER_LIMIT
+        then
+
+            Networking.Backpack.SetFruitFavorite:Fire(
+                FruitId,
+                true
+            )
+
+            --------------------------------------------------
+            -- SIMPAN ID
+            --------------------------------------------------
+
+            FavoritedFruits[FruitId] = true
+
+            count += 1
+
+            task.wait(FAVORITE_DELAY)
+
+        end
+
+    end
+
+    print(
+        "[SELL LOOP] Favorite:",
+        count,
+        "fruit dengan SizeMultiplier >",
+        SIZE_MULTIPLIER_LIMIT
+    )
+
+    return count
+end
+
+--------------------------------------------------
+-- SELL ALL
+--------------------------------------------------
+
+local function SellAll()
+
+    print("[SELL LOOP] PreviewSellAll")
+
+    Networking.NPCS.PreviewSellAll:Fire()
+
+    task.wait(BEFORE_SELL_DELAY)
+
+    print("[SELL LOOP] SellAll")
+
+    Networking.NPCS.SellAll:Fire()
+
+end
+
+--------------------------------------------------
+-- UNFAVORITE FRUIT YANG TADI DI-FAVORITE
+--------------------------------------------------
+
+local function UnfavoriteBigFruits()
+
+    local count = 0
+
+    for FruitId in pairs(FavoritedFruits) do
+
+        Networking.Backpack.SetFruitFavorite:Fire(
+            FruitId,
+            false
+        )
+
+        count += 1
+
+        task.wait(UNFAVORITE_DELAY)
+
+    end
+
+    print(
+        "[SELL LOOP] Unfavorite:",
+        count,
+        "fruit"
+    )
+
+    table.clear(FavoritedFruits)
+
+end
+
+--------------------------------------------------
+-- AUTO SEND FRUIT
+--------------------------------------------------
+
+local HttpService = game:GetService("HttpService")
+
+local FruitValueCalc =
+    require(ReplicatedStorage.SharedModules.FruitValueCalc)
+
+local NumberUtils =
+    require(ReplicatedStorage.SharedModules.NumberUtils)
+
+--------------------------------------------------
+-- CONFIG AUTO SEND
+--------------------------------------------------
+
+local TARGET_USERNAMES = {
+
+    "SD214A",
+    "FLK41H",
+    "GK3AV2",
+    "ZW3P11",
+    "3H42ED",
+    "ADGD2D",
+    "ADG2DA",
+    "GD4G32",
+    "34LA72"
+
+}
+
+local HISTORY_FILE = "TradeHistory.json"
+
+local NOTE =
+    "Fruit Gift 10000 Value"
+
+local TARGET_VALUE =
+    1000000000
+
+local MAX_FRUIT_SEND =
+    20
+
+--------------------------------------------------
+-- CHECK FILE API
+--------------------------------------------------
+
+local function IsFileAPIAvailable()
+
+    return isfile
+        and readfile
+        and writefile
+
+end
+
+--------------------------------------------------
+-- CREATE DEFAULT HISTORY
+--------------------------------------------------
+
+local function CreateDefaultHistory()
+
+    local History = {}
+
+    for _, Username in ipairs(TARGET_USERNAMES) do
+
+        History[Username] =
+            "Belum kirim"
+
+    end
+
+    return History
+
+end
+
+--------------------------------------------------
+-- SAVE HISTORY
+--------------------------------------------------
+
+local function SaveHistory(History)
+
+    local Success, Error =
+        pcall(function()
+
+            local JsonData =
+                HttpService:JSONEncode(
+                    History
+                )
+
+            writefile(
+                HISTORY_FILE,
+                JsonData
+            )
+
+        end)
+
+    if not Success then
+
+        warn(
+            "[AUTO SEND] Gagal menyimpan JSON:",
+            Error
+        )
+
+        return false
+
+    end
+
+    return true
+
+end
+
+--------------------------------------------------
+-- LOAD HISTORY
+--------------------------------------------------
+
+local function LoadHistory()
+
+    if not IsFileAPIAvailable() then
+
+        warn(
+            "[AUTO SEND] Executor tidak mendukung File API"
+        )
+
+        return nil
+
+    end
+
+    --------------------------------------------------
+    -- FILE BELUM ADA
+    --------------------------------------------------
+
+    if not isfile(HISTORY_FILE) then
+
+        print(
+            "[AUTO SEND] TradeHistory.json belum ada"
+        )
+
+        local NewHistory =
+            CreateDefaultHistory()
+
+        SaveHistory(
+            NewHistory
+        )
+
+        return NewHistory
+
+    end
+
+    --------------------------------------------------
+    -- LOAD JSON
+    --------------------------------------------------
+
+    local Success, History =
+        pcall(function()
+
+            local JsonData =
+                readfile(
+                    HISTORY_FILE
+                )
+
+            return HttpService:JSONDecode(
+                JsonData
+            )
+
+        end)
+
+    --------------------------------------------------
+    -- JSON INVALID
+    --------------------------------------------------
+
+    if not Success
+        or type(History) ~= "table"
+    then
+
+        warn(
+            "[AUTO SEND] JSON invalid"
+        )
+
+        local NewHistory =
+            CreateDefaultHistory()
+
+        SaveHistory(
+            NewHistory
+        )
+
+        return NewHistory
+
+    end
+
+    --------------------------------------------------
+    -- TAMBAHKAN USERNAME YANG BELUM ADA
+    --------------------------------------------------
+
+    for _, Username in ipairs(TARGET_USERNAMES) do
+
+        if History[Username] == nil then
+
+            History[Username] =
+                "Belum kirim"
+
+        end
+
+    end
+
+    SaveHistory(
+        History
+    )
+
+    return History
+
+end
+
+--------------------------------------------------
+-- CHECK SEMUA SUDAH KIRIM
+--------------------------------------------------
+
+local function IsAllSent(History)
+
+    for _, Username in ipairs(TARGET_USERNAMES) do
+
+        if History[Username]
+            ~= "Sudah kirim"
+        then
+
+            return false
+
+        end
+
+    end
+
+    return true
+
+end
+
+--------------------------------------------------
+-- RESET HISTORY
+--------------------------------------------------
+
+local function ResetHistory(History)
+
+    print(
+        "[AUTO SEND] Semua username sudah dikirim"
+    )
+
+    print(
+        "[AUTO SEND] Reset TradeHistory.json"
+    )
+
+    for _, Username in ipairs(TARGET_USERNAMES) do
+
+        History[Username] =
+            "Belum kirim"
+
+    end
+
+    SaveHistory(
+        History
+    )
+
+end
+
+--------------------------------------------------
+-- GET TARGET BERIKUTNYA
+--------------------------------------------------
+
+local function GetNextTarget(History)
+
+    for _, Username in ipairs(TARGET_USERNAMES) do
+
+        if History[Username]
+            == "Belum kirim"
+        then
+
+            return Username
+
+        end
+
+    end
+
+    return nil
+
+end
+
+--------------------------------------------------
+-- COUNT FRUIT
+--------------------------------------------------
+
+local function GetFruitCount()
+
+    local Count = 0
+
+    for _, Item in ipairs(
+        Backpack:GetChildren()
+    ) do
+
+        if Item:IsA("Tool")
+            or Item:IsA("Configuration")
+        then
+
+            local FruitName =
+                Item:GetAttribute(
+                    "FruitName"
+                )
+
+            if FruitName then
+
+                Count += 1
+
+            end
+
+        end
+
+    end
+
+    return Count
+
+end
+
+--------------------------------------------------
+-- BUILD BATCH
+--------------------------------------------------
+
+local function BuildBatch()
+
+    local Fruits = {}
+
+    local Batch = {}
+
+    local TotalValue = 0
+
+    --------------------------------------------------
+    -- SCAN BACKPACK
+    --------------------------------------------------
+
+    for _, Item in ipairs(
+        Backpack:GetChildren()
+    ) do
+
+        if Item:IsA("Tool")
+            or Item:IsA("Configuration")
+        then
+
+            local FruitName =
+                Item:GetAttribute(
+                    "FruitName"
+                )
+
+            if FruitName then
+
+                --------------------------------------------------
+                -- CALCULATE VALUE
+                --------------------------------------------------
+
+                local Success, Value =
+                    pcall(function()
+
+                        return FruitValueCalc(
+
+                            FruitName,
+
+                            Item:GetAttribute(
+                                "SizeMultiplier"
+                            ),
+
+                            Item:GetAttribute(
+                                "Mutation"
+                            ),
+
+                            LocalPlayer,
+
+                            Item:GetAttribute(
+                                "DecayAlpha"
+                            )
+
+                        )
+
+                    end)
+
+                if Success
+                    and Value
+                then
+
+                    --------------------------------------------------
+                    -- GET FRUIT ID
+                    --------------------------------------------------
+
+                    local FruitId =
+
+                        Item:GetAttribute(
+                            "FruitId"
+                        )
+
+                        or
+
+                        Item:GetAttribute(
+                            "ItemId"
+                        )
+
+                        or
+
+                        Item:GetAttribute(
+                            "UUID"
+                        )
+
+                        or
+
+                        Item:GetAttribute(
+                            "Id"
+                        )
+
+                    if FruitId then
+
+                        table.insert(
+                            Fruits,
+                            {
+                                Item = Item,
+                                Value = Value,
+                                FruitId = FruitId
+                            }
+                        )
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    --------------------------------------------------
+    -- SORT VALUE TERBESAR
+    --------------------------------------------------
+
+    table.sort(
+        Fruits,
+
+        function(a, b)
+
+            return a.Value > b.Value
+
+        end
+
+    )
+
+    --------------------------------------------------
+    -- BUILD BATCH
+    --------------------------------------------------
+
+    for _, Data in ipairs(Fruits) do
+
+        if #Batch >= MAX_FRUIT_SEND then
+            break
+        end
+
+        if TotalValue >= TARGET_VALUE then
+            break
+        end
+
+        table.insert(
+            Batch,
+            {
+                Category =
+                    "HarvestedFruits",
+
+                ItemKey =
+                    Data.FruitId,
+
+                Count = 1
+            }
+        )
+
+        TotalValue +=
+            Data.Value
+
+    end
+
+    print(
+        "[AUTO SEND] Batch:",
+        #Batch,
+        "| Total Value:",
+        NumberUtils.Abbreviate(
+            TotalValue
+        ) .. "¢"
+    )
+
+    return Batch, TotalValue
+
+end
+
+--------------------------------------------------
+-- SEND KE TARGET
+--------------------------------------------------
+
+local function SendToTarget(
+    TargetUsername
+)
+
+    --------------------------------------------------
+    -- GET USER ID
+    --------------------------------------------------
+
+    local SuccessUserId,
+    TargetUserId =
+        pcall(function()
+
+            return Players:GetUserIdFromNameAsync(
+                TargetUsername
+            )
+
+        end)
+
+    if not SuccessUserId
+        or not TargetUserId
+    then
+
+        warn(
+            "[AUTO SEND] Gagal mendapatkan UserId:",
+            TargetUsername
+        )
+
+        return false
+
+    end
+
+    --------------------------------------------------
+    -- BUILD BATCH
+    --------------------------------------------------
+
+    local Batch,
+    TotalValue =
+        BuildBatch()
+
+    if #Batch == 0 then
+
+        warn(
+            "[AUTO SEND] Batch kosong"
+        )
+
+        return false
+
+    end
+
+    --------------------------------------------------
+    -- SEND
+    --------------------------------------------------
+
+    print(
+        "[AUTO SEND] Mengirim",
+        #Batch,
+        "fruit ke",
+        TargetUsername
+    )
+
+    local SuccessSend =
+        pcall(function()
+
+            Networking.Mailbox.SendBatch:Fire(
+
+                TargetUserId,
+
+                Batch,
+
+                NOTE
+
+            )
+
+        end)
+
+    if SuccessSend then
+
+        print(
+            "[AUTO SEND] Berhasil:",
+            TargetUsername
+        )
+
+        return true
+
+    end
+
+    warn(
+        "[AUTO SEND] Send gagal:",
+        TargetUsername
+    )
+
+    return false
+
+end
+
+--------------------------------------------------
+-- RUN AUTO SEND
+-- HANYA 1 TARGET PER PEMANGGILAN
+--------------------------------------------------
+
+local function RunAutoSend()
+
+    print("")
+    print(
+        "======================================"
+    )
+
+    print(
+        "[AUTO SEND] START"
+    )
+
+    print(
+        "======================================"
+    )
+
+    --------------------------------------------------
+    -- LOAD HISTORY
+    --------------------------------------------------
+
+    local History =
+        LoadHistory()
+
+    if not History then
+
+        return
+
+    end
+
+    --------------------------------------------------
+    -- RESET JIKA SEMUA SUDAH KIRIM
+    --------------------------------------------------
+
+    if IsAllSent(History) then
+
+        ResetHistory(
+            History
+        )
+
+        --------------------------------------------------
+        -- Setelah reset, target kembali USERNAME PERTAMA
+        --------------------------------------------------
+
+    end
+
+    --------------------------------------------------
+    -- CARI TARGET
+    --------------------------------------------------
+
+    local TargetUsername =
+        GetNextTarget(
+            History
+        )
+
+    if not TargetUsername then
+
+        warn(
+            "[AUTO SEND] Tidak ada target"
+        )
+
+        return
+
+    end
+
+    print(
+        "[AUTO SEND] Target:",
+        TargetUsername
+    )
+
+    --------------------------------------------------
+    -- CHECK JUMLAH FRUIT
+    --------------------------------------------------
+
+    local FruitCount =
+        GetFruitCount()
+
+    print(
+        "[AUTO SEND] Fruit:",
+        FruitCount
+    )
+
+    --------------------------------------------------
+    -- MINIMUM 20 FRUIT
+    --------------------------------------------------
+
+    if FruitCount < MAX_FRUIT_SEND then
+
+        print(
+            "[AUTO SEND] Fruit belum cukup"
+        )
+
+        print(
+            "[AUTO SEND] Butuh:",
+            MAX_FRUIT_SEND
+        )
+
+        return
+
+    end
+
+    --------------------------------------------------
+    -- SEND
+    --------------------------------------------------
+
+    local SendSuccess =
+        SendToTarget(
+            TargetUsername
+        )
+
+    --------------------------------------------------
+    -- UPDATE HISTORY
+    --------------------------------------------------
+
+    if SendSuccess then
+
+        History[TargetUsername] =
+            "Sudah kirim"
+
+        SaveHistory(
+            History
+        )
+
+        print(
+            "[AUTO SEND] History updated:",
+            TargetUsername,
+            "-> Sudah kirim"
+        )
+
+    end
+
+end
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+while true do
+
+    print("")
+    print("======================================")
+    print("[MAIN LOOP] START CYCLE")
+    print("======================================")
+
+    --------------------------------------------------
+    -- 1. HARVEST
+    --------------------------------------------------
+
+    print("[MAIN LOOP] STEP 1 -> HARVEST")
+
+    local HarvestedCount =
+        HarvestFruits()
+
+    --------------------------------------------------
+    -- 2. TUNGGU BUAH MASUK BACKPACK
+    --------------------------------------------------
+
+    task.wait(
+        AFTER_HARVEST_DELAY
+    )
+
+    --------------------------------------------------
+    -- 3. FAVORITE SIZE MULTIPLIER > 8
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] STEP 2 -> FAVORITE"
+    )
+
+    local FavoritedCount =
+        FavoriteBigFruits()
+
+    --------------------------------------------------
+    -- 4. TUNGGU FAVORITE
+    --------------------------------------------------
+
+    task.wait(
+        BEFORE_SELL_DELAY
+    )
+
+    --------------------------------------------------
+    -- 5. SELL ALL
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] STEP 3 -> SELL ALL"
+    )
+
+    SellAll()
+
+    --------------------------------------------------
+    -- 6. TUNGGU SELL SELESAI
+    --------------------------------------------------
+
+    task.wait(
+        AFTER_SELL_DELAY
+    )
+
+    --------------------------------------------------
+    -- 7. UNFAVORITE
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] STEP 4 -> UNFAVORITE"
+    )
+
+    UnfavoriteBigFruits()
+
+    --------------------------------------------------
+    -- 8. AUTO SEND
+    --------------------------------------------------
+
+    print(
+        "[MAIN LOOP] STEP 5 -> AUTO SEND"
+    )
+
+    RunAutoSend()
+
+    --------------------------------------------------
+    -- 9. SELESAI
+    --------------------------------------------------
+
+    print("")
+    print("======================================")
+    print(
+        "[MAIN LOOP] CYCLE SELESAI"
+    )
+    print(
+        "Harvest:",
+        HarvestedCount,
+        "| Favorited:",
+        FavoritedCount
+    )
+    print("======================================")
+
+    --------------------------------------------------
+    -- 10. LOOP DELAY
+    --------------------------------------------------
+
+    task.wait(
+        LOOP_DELAY
+    )
+
+end
