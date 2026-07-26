@@ -1,42 +1,77 @@
 --==================================================
--- HARVEST + SELL + AUTO SENDa
--- MODERN GUI + TRADE HISTORY
+-- HARVEST + SELL + AUTO SENDz
+-- MODERN GUI
 --
--- FEATURES:
+-- GUI:
 -- 1. HEADER
 -- 2. START / STOP
 -- 3. CURRENT STEP
 -- 4. ADD PLAYER
--- 5. REMOVE PLAYER
+-- 5. REMOVE PLAYER (LIST)
 -- 6. TRADE HISTORY
--- 7. VALUE HISTORY
--- 8. PROGRESS
--- 9. AUTO START = TRUE
--- 10. REALTIME HISTORY REFRESH
+--
+-- AUTO START = TRUE
 --==================================================
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+--==================================================
+-- SERVICES
+--==================================================
+
+local Players =
+    game:GetService("Players")
+
+local ReplicatedStorage =
+    game:GetService("ReplicatedStorage")
+
+local HttpService =
+    game:GetService("HttpService")
+
+local UserInputService =
+    game:GetService("UserInputService")
+
+
+--==================================================
+-- PLAYER
+--==================================================
+
+local LocalPlayer =
+    Players.LocalPlayer
+
+local PlayerGui =
+    LocalPlayer:WaitForChild("PlayerGui")
+
+
+--==================================================
+-- MODULES
+--==================================================
 
 local Networking =
-    require(ReplicatedStorage.SharedModules.Networking)
+    require(
+        ReplicatedStorage.SharedModules.Networking
+    )
 
 local FruitValueCalc =
-    require(ReplicatedStorage.SharedModules.FruitValueCalc)
+    require(
+        ReplicatedStorage.SharedModules.FruitValueCalc
+    )
 
 local NumberUtils =
-    require(ReplicatedStorage.SharedModules.NumberUtils)
+    require(
+        ReplicatedStorage.SharedModules.NumberUtils
+    )
+
+
+--==================================================
+-- REFERENCES
+--==================================================
 
 local Gardens =
     workspace:WaitForChild("Gardens")
 
 local Backpack =
     LocalPlayer:WaitForChild("Backpack")
+
 
 --==================================================
 -- CONFIG
@@ -62,27 +97,39 @@ local TARGET_VALUE = 1000000000
 
 local MAX_FRUIT_SEND = 20
 
-local HISTORY_FILE = "TradeHistory.json"
+local HISTORY_FILE =
+    "TradeHistory.json"
 
-local NOTE = "Fruit Gift 10000 Value"
+local NOTE =
+    "Fruit Gift 10000 Value"
 
-local HISTORY_REFRESH_DELAY = 1
 
 --==================================================
 -- DEFAULT USERNAME
 --==================================================
 
 local TARGET_USERNAMES = {
+
     "SD214A",
+
     "FLK41H",
+
     "GK3AV2",
+
     "ZW3P11",
+
     "3H42ED",
+
     "ADGD2D",
+
     "ADG2DA",
+
     "GD4G32",
+
     "34LA72"
+
 }
+
 
 --==================================================
 -- STATE
@@ -90,192 +137,27 @@ local TARGET_USERNAMES = {
 
 local Running = true
 
-local CurrentStep = "Starting..."
+local CurrentStep =
+    "Starting..."
 
 local FavoritedFruits = {}
 
 local History = {}
+
 
 --==================================================
 -- BLACKLIST
 --==================================================
 
 local BLACKLIST = {
+
     NAMEFRUIT = true,
+
 }
 
---==================================================
--- REMOVE OLD GUI
---==================================================
-
-local OldGUI =
-    PlayerGui:FindFirstChild(
-        "HarvestTradeGUI"
-    )
-
-if OldGUI then
-    OldGUI:Destroy()
-end
 
 --==================================================
--- FILE API
---==================================================
-
-local function IsFileAPIAvailable()
-
-    return
-        isfile
-        and readfile
-        and writefile
-
-end
-
---==================================================
--- CREATE DEFAULT HISTORY
---==================================================
-
-local function CreateDefaultHistory()
-
-    local NewHistory = {}
-
-    for _, Username in ipairs(
-        TARGET_USERNAMES
-    ) do
-
-        NewHistory[Username] = {
-            Status = "Belum kirim",
-            Value = 0
-        }
-
-    end
-
-    return NewHistory
-
-end
-
---==================================================
--- SAVE HISTORY
---==================================================
-
-local function SaveHistory()
-
-    if not IsFileAPIAvailable() then
-        return false
-    end
-
-    local Success =
-        pcall(function()
-
-            writefile(
-                HISTORY_FILE,
-                HttpService:JSONEncode(
-                    History
-                )
-            )
-
-        end)
-
-    return Success
-
-end
-
---==================================================
--- LOAD HISTORY
---==================================================
-
-local function LoadHistory()
-
-    if not IsFileAPIAvailable() then
-
-        History =
-            CreateDefaultHistory()
-
-        return
-
-    end
-
-    if not isfile(HISTORY_FILE) then
-
-        History =
-            CreateDefaultHistory()
-
-        SaveHistory()
-
-        return
-
-    end
-
-    local Success, Data =
-        pcall(function()
-
-            return HttpService:JSONDecode(
-                readfile(HISTORY_FILE)
-            )
-
-        end)
-
-    if Success
-        and type(Data) == "table" then
-
-        History = Data
-
-    else
-
-        History =
-            CreateDefaultHistory()
-
-    end
-
-    --==================================================
-    -- MIGRATION OLD FORMAT
-    --==================================================
-
-    for _, Username in ipairs(
-        TARGET_USERNAMES
-    ) do
-
-        if History[Username] == nil then
-
-            History[Username] = {
-                Status = "Belum kirim",
-                Value = 0
-            }
-
-        elseif type(
-            History[Username]
-        ) == "string" then
-
-            History[Username] = {
-                Status =
-                    History[Username],
-
-                Value = 0
-            }
-
-        elseif type(
-            History[Username]
-        ) == "table" then
-
-            History[Username].Status =
-                History[Username].Status
-                or "Belum kirim"
-
-            History[Username].Value =
-                tonumber(
-                    History[Username].Value
-                )
-                or 0
-
-        end
-
-    end
-
-    SaveHistory()
-
-end
-
---==================================================
--- CREATE GUI
+-- GUI
 --==================================================
 
 local ScreenGui =
@@ -292,6 +174,7 @@ ScreenGui.ZIndexBehavior =
 
 ScreenGui.Parent =
     PlayerGui
+
 
 --==================================================
 -- MAIN
@@ -332,6 +215,7 @@ Main.BorderSizePixel =
 Main.Parent =
     ScreenGui
 
+
 local Corner =
     Instance.new("UICorner")
 
@@ -344,15 +228,13 @@ Corner.CornerRadius =
 Corner.Parent =
     Main
 
+
 --==================================================
 -- HEADER
 --==================================================
 
 local Header =
     Instance.new("TextLabel")
-
-Header.Name =
-    "Header"
 
 Header.Size =
     UDim2.new(
@@ -384,15 +266,13 @@ Header.TextSize =
 Header.Parent =
     Main
 
+
 --==================================================
 -- START BUTTON
 --==================================================
 
 local StartButton =
     Instance.new("TextButton")
-
-StartButton.Name =
-    "StartButton"
 
 StartButton.Size =
     UDim2.new(
@@ -436,6 +316,7 @@ StartButton.BackgroundColor3 =
 StartButton.Parent =
     Main
 
+
 local StartCorner =
     Instance.new("UICorner")
 
@@ -448,15 +329,13 @@ StartCorner.CornerRadius =
 StartCorner.Parent =
     StartButton
 
+
 --==================================================
 -- STOP BUTTON
 --==================================================
 
 local StopButton =
     Instance.new("TextButton")
-
-StopButton.Name =
-    "StopButton"
 
 StopButton.Size =
     UDim2.new(
@@ -500,6 +379,7 @@ StopButton.BackgroundColor3 =
 StopButton.Parent =
     Main
 
+
 local StopCorner =
     Instance.new("UICorner")
 
@@ -512,15 +392,13 @@ StopCorner.CornerRadius =
 StopCorner.Parent =
     StopButton
 
+
 --==================================================
 -- CURRENT STEP
 --==================================================
 
 local StepLabel =
     Instance.new("TextLabel")
-
-StepLabel.Name =
-    "StepLabel"
 
 StepLabel.Size =
     UDim2.new(
@@ -567,6 +445,7 @@ StepLabel.TextXAlignment =
 StepLabel.Parent =
     Main
 
+
 local StepPadding =
     Instance.new("UIPadding")
 
@@ -578,6 +457,7 @@ StepPadding.PaddingLeft =
 
 StepPadding.Parent =
     StepLabel
+
 
 local StepCorner =
     Instance.new("UICorner")
@@ -591,8 +471,9 @@ StepCorner.CornerRadius =
 StepCorner.Parent =
     StepLabel
 
+
 --==================================================
--- ADD PLAYER
+-- ADD PLAYER BUTTON
 --==================================================
 
 local AddButton =
@@ -640,6 +521,7 @@ AddButton.BackgroundColor3 =
 AddButton.Parent =
     Main
 
+
 local AddCorner =
     Instance.new("UICorner")
 
@@ -652,8 +534,9 @@ AddCorner.CornerRadius =
 AddCorner.Parent =
     AddButton
 
+
 --==================================================
--- REMOVE PLAYER
+-- REMOVE PLAYER BUTTON
 --==================================================
 
 local RemoveButton =
@@ -701,6 +584,7 @@ RemoveButton.BackgroundColor3 =
 RemoveButton.Parent =
     Main
 
+
 local RemoveCorner =
     Instance.new("UICorner")
 
@@ -712,6 +596,7 @@ RemoveCorner.CornerRadius =
 
 RemoveCorner.Parent =
     RemoveButton
+
 
 --==================================================
 -- TRADE HISTORY TITLE
@@ -761,15 +646,13 @@ HistoryTitle.TextXAlignment =
 HistoryTitle.Parent =
     Main
 
+
 --==================================================
 -- HISTORY SCROLL
 --==================================================
 
 local HistoryScroll =
     Instance.new("ScrollingFrame")
-
-HistoryScroll.Name =
-    "HistoryScroll"
 
 HistoryScroll.Size =
     UDim2.new(
@@ -806,6 +689,7 @@ HistoryScroll.AutomaticCanvasSize =
 HistoryScroll.Parent =
     Main
 
+
 local HistoryLayout =
     Instance.new("UIListLayout")
 
@@ -815,11 +699,9 @@ HistoryLayout.Padding =
         5
     )
 
-HistoryLayout.SortOrder =
-    Enum.SortOrder.LayoutOrder
-
 HistoryLayout.Parent =
     HistoryScroll
+
 
 local HistoryPadding =
     Instance.new("UIPadding")
@@ -842,62 +724,9 @@ HistoryPadding.PaddingRight =
         7
     )
 
-HistoryPadding.PaddingBottom =
-    UDim.new(
-        0,
-        7
-    )
-
 HistoryPadding.Parent =
     HistoryScroll
 
---==================================================
--- PROGRESS LABEL
---==================================================
-
-local ProgressLabel =
-    Instance.new("TextLabel")
-
-ProgressLabel.Size =
-    UDim2.new(
-        1,
-        -30,
-        0,
-        20
-    )
-
-ProgressLabel.Position =
-    UDim2.new(
-        0,
-        15,
-        1,
-        -28
-    )
-
-ProgressLabel.BackgroundTransparency =
-    1
-
-ProgressLabel.Text =
-    "Delivery Progress: 0 / 0"
-
-ProgressLabel.TextColor3 =
-    Color3.fromRGB(
-        150,
-        150,
-        165
-    )
-
-ProgressLabel.Font =
-    Enum.Font.GothamBold
-
-ProgressLabel.TextSize =
-    11
-
-ProgressLabel.TextXAlignment =
-    Enum.TextXAlignment.Left
-
-ProgressLabel.Parent =
-    Main
 
 --==================================================
 -- CURRENT STEP FUNCTION
@@ -909,8 +738,8 @@ local function SetStep(Text)
         Text
 
     StepLabel.Text =
-        "Current Step: "
-        .. Text
+        "Current Step: " ..
+        Text
 
     print(
         "[CURRENT STEP]",
@@ -919,42 +748,187 @@ local function SetStep(Text)
 
 end
 
+
 --==================================================
--- FORMAT VALUE
+-- FILE API
 --==================================================
 
-local function FormatValue(Value)
+local function IsFileAPIAvailable()
 
-    Value =
-        tonumber(Value)
-        or 0
-
-    if Value <= 0 then
-        return "0"
-    end
-
-    local Success, Result =
-        pcall(function()
-
-            return NumberUtils.Abbreviate(
-                Value
-            )
-
-        end)
-
-    if Success then
-
-        return tostring(
-            Result
-        )
-
-    end
-
-    return tostring(
-        Value
+    return (
+        isfile
+        and
+        readfile
+        and
+        writefile
     )
 
 end
+
+
+--==================================================
+-- CREATE DEFAULT HISTORY
+--==================================================
+
+local function CreateDefaultHistory()
+
+    local NewHistory = {}
+
+    for _, Username in ipairs(
+        TARGET_USERNAMES
+    ) do
+
+        NewHistory[Username] = {
+
+            Status =
+                "Belum kirim",
+
+            Value =
+                0
+
+        }
+
+    end
+
+    return NewHistory
+
+end
+
+
+--==================================================
+-- SAVE HISTORY
+--==================================================
+
+local function SaveHistory()
+
+    if not IsFileAPIAvailable() then
+
+        return false
+
+    end
+
+    local Success =
+        pcall(
+            function()
+
+                writefile(
+                    HISTORY_FILE,
+                    HttpService:JSONEncode(
+                        History
+                    )
+                )
+
+            end
+        )
+
+    return Success
+
+end
+
+
+--==================================================
+-- LOAD HISTORY
+--==================================================
+
+local function LoadHistory()
+
+    if not IsFileAPIAvailable() then
+
+        History =
+            CreateDefaultHistory()
+
+        return
+
+    end
+
+
+    if not isfile(
+        HISTORY_FILE
+    ) then
+
+        History =
+            CreateDefaultHistory()
+
+        SaveHistory()
+
+        return
+
+    end
+
+
+    local Success, Data =
+        pcall(
+            function()
+
+                return HttpService:JSONDecode(
+                    readfile(
+                        HISTORY_FILE
+                    )
+                )
+
+            end
+        )
+
+
+    if Success
+        and
+        type(Data) == "table"
+    then
+
+        History =
+            Data
+
+    else
+
+        History =
+            CreateDefaultHistory()
+
+    end
+
+
+    --==================================================
+    -- MIGRATION OLD FORMAT
+    --==================================================
+
+    for _, Username in ipairs(
+        TARGET_USERNAMES
+    ) do
+
+        if History[Username] == nil then
+
+            History[Username] = {
+
+                Status =
+                    "Belum kirim",
+
+                Value =
+                    0
+
+            }
+
+        elseif type(
+            History[Username]
+        ) == "string" then
+
+            History[Username] = {
+
+                Status =
+                    History[Username],
+
+                Value =
+                    0
+
+            }
+
+        end
+
+    end
+
+
+    SaveHistory()
+
+end
+
 
 --==================================================
 -- REFRESH HISTORY GUI
@@ -966,7 +940,9 @@ local function RefreshHistoryGUI()
         HistoryScroll:GetChildren()
     ) do
 
-        if Child:IsA("Frame") then
+        if Child:IsA(
+            "Frame"
+        ) then
 
             Child:Destroy()
 
@@ -974,14 +950,6 @@ local function RefreshHistoryGUI()
 
     end
 
-    local SentCount = 0
-
-    local TotalCount =
-        #TARGET_USERNAMES
-
-    --==================================================
-    -- CREATE ROW
-    --==================================================
 
     for Index, Username in ipairs(
         TARGET_USERNAMES
@@ -990,11 +958,17 @@ local function RefreshHistoryGUI()
         local Data =
             History[Username]
 
+
         if not Data then
 
             Data = {
-                Status = "Belum kirim",
-                Value = 0
+
+                Status =
+                    "Belum kirim",
+
+                Value =
+                    0
+
             }
 
             History[Username] =
@@ -1002,18 +976,13 @@ local function RefreshHistoryGUI()
 
         end
 
-        if Data.Status ==
-            "Sudah kirim" then
-
-            SentCount += 1
-
-        end
 
         local Row =
             Instance.new("Frame")
 
         Row.Name =
-            "History_" .. Username
+            "History_" ..
+            Username
 
         Row.Size =
             UDim2.new(
@@ -1024,27 +993,18 @@ local function RefreshHistoryGUI()
             )
 
         Row.BackgroundColor3 =
-            Data.Status ==
-            "Sudah kirim"
-            and Color3.fromRGB(
-                32,
-                55,
-                42
-            )
-            or Color3.fromRGB(
+            Color3.fromRGB(
                 38,
                 38,
                 48
             )
-
-        Row.BorderSizePixel =
-            0
 
         Row.LayoutOrder =
             Index
 
         Row.Parent =
             HistoryScroll
+
 
         local RowCorner =
             Instance.new("UICorner")
@@ -1058,8 +1018,9 @@ local function RefreshHistoryGUI()
         RowCorner.Parent =
             Row
 
+
         --==================================================
-        -- USERNAME
+        -- NAME
         --==================================================
 
         local NameLabel =
@@ -1106,6 +1067,7 @@ local function RefreshHistoryGUI()
         NameLabel.Parent =
             Row
 
+
         --==================================================
         -- STATUS
         --==================================================
@@ -1134,17 +1096,20 @@ local function RefreshHistoryGUI()
 
         StatusLabel.Text =
             Data.Status
-            or "Belum kirim"
+            or
+            "Belum kirim"
 
         StatusLabel.TextColor3 =
             Data.Status ==
             "Sudah kirim"
-            and Color3.fromRGB(
+            and
+            Color3.fromRGB(
                 80,
                 220,
                 120
             )
-            or Color3.fromRGB(
+            or
+            Color3.fromRGB(
                 255,
                 190,
                 70
@@ -1161,6 +1126,7 @@ local function RefreshHistoryGUI()
 
         StatusLabel.Parent =
             Row
+
 
         --==================================================
         -- VALUE
@@ -1188,11 +1154,59 @@ local function RefreshHistoryGUI()
         ValueLabel.BackgroundTransparency =
             1
 
-        ValueLabel.Text =
-            "Value: "
-            .. FormatValue(
+
+        local Value =
+            tonumber(
                 Data.Value
             )
+            or
+            0
+
+
+        local ValueText
+
+
+        if Value > 0 then
+
+            local Success, Result =
+                pcall(
+                    function()
+
+                        return NumberUtils.Abbreviate(
+                            Value
+                        )
+
+                    end
+                )
+
+
+            if Success then
+
+                ValueText =
+                    tostring(
+                        Result
+                    )
+
+            else
+
+                ValueText =
+                    tostring(
+                        Value
+                    )
+
+            end
+
+        else
+
+            ValueText =
+                "0"
+
+        end
+
+
+        ValueLabel.Text =
+            "Value: " ..
+            ValueText
 
         ValueLabel.TextColor3 =
             Color3.fromRGB(
@@ -1215,25 +1229,8 @@ local function RefreshHistoryGUI()
 
     end
 
-    --==================================================
-    -- PROGRESS
-    --==================================================
-
-    ProgressLabel.Text =
-        string.format(
-            "Delivery Progress: %d / %d  (%d%%)",
-            SentCount,
-            TotalCount,
-            TotalCount > 0
-            and math.floor(
-                SentCount
-                / TotalCount
-                * 100
-            )
-            or 0
-        )
-
 end
+
 
 --==================================================
 -- ADD PLAYER
@@ -1244,23 +1241,29 @@ local function AddPlayer(
 )
 
     if not Username
-        or Username == "" then
+        or
+        Username == ""
+    then
 
         return
 
     end
+
 
     Username =
         tostring(
             Username
         )
 
+
     for _, Existing in ipairs(
         TARGET_USERNAMES
     ) do
 
         if Existing:lower()
-            == Username:lower() then
+            ==
+            Username:lower()
+        then
 
             return
 
@@ -1268,19 +1271,28 @@ local function AddPlayer(
 
     end
 
+
     table.insert(
         TARGET_USERNAMES,
         Username
     )
 
+
     History[Username] = {
-        Status = "Belum kirim",
-        Value = 0
+
+        Status =
+            "Belum kirim",
+
+        Value =
+            0
+
     }
+
 
     SaveHistory()
 
     RefreshHistoryGUI()
+
 
     print(
         "[GUI] Added player:",
@@ -1288,6 +1300,7 @@ local function AddPlayer(
     )
 
 end
+
 
 --==================================================
 -- REMOVE PLAYER
@@ -1298,18 +1311,23 @@ local function RemovePlayer(
 )
 
     if not Username
-        or Username == "" then
+        or
+        Username == ""
+    then
 
         return
 
     end
+
 
     for Index, Existing in ipairs(
         TARGET_USERNAMES
     ) do
 
         if Existing:lower()
-            == Username:lower() then
+            ==
+            Username:lower()
+        then
 
             table.remove(
                 TARGET_USERNAMES,
@@ -1322,6 +1340,7 @@ local function RemovePlayer(
             SaveHistory()
 
             RefreshHistoryGUI()
+
 
             print(
                 "[GUI] Removed player:",
@@ -1336,8 +1355,10 @@ local function RemovePlayer(
 
 end
 
+
 --==================================================
 -- INPUT WINDOW
+-- USED FOR ADD PLAYER
 --==================================================
 
 local function CreateInputWindow(
@@ -1347,6 +1368,9 @@ local function CreateInputWindow(
 
     local Overlay =
         Instance.new("Frame")
+
+    Overlay.Name =
+        "InputOverlay"
 
     Overlay.Size =
         UDim2.new(
@@ -1371,6 +1395,7 @@ local function CreateInputWindow(
 
     Overlay.Parent =
         Main
+
 
     local Box =
         Instance.new("Frame")
@@ -1398,11 +1423,15 @@ local function CreateInputWindow(
             45
         )
 
+    Box.BorderSizePixel =
+        0
+
     Box.ZIndex =
         21
 
     Box.Parent =
         Overlay
+
 
     local BoxCorner =
         Instance.new("UICorner")
@@ -1415,6 +1444,7 @@ local function CreateInputWindow(
 
     BoxCorner.Parent =
         Box
+
 
     local Title =
         Instance.new("TextLabel")
@@ -1459,6 +1489,7 @@ local function CreateInputWindow(
 
     Title.Parent =
         Box
+
 
     local Input =
         Instance.new("TextBox")
@@ -1511,6 +1542,7 @@ local function CreateInputWindow(
     Input.Parent =
         Box
 
+
     local Confirm =
         Instance.new("TextButton")
 
@@ -1558,6 +1590,7 @@ local function CreateInputWindow(
 
     Confirm.Parent =
         Box
+
 
     local Cancel =
         Instance.new("TextButton")
@@ -1607,6 +1640,7 @@ local function CreateInputWindow(
     Cancel.Parent =
         Box
 
+
     Confirm.MouseButton1Click:Connect(
         function()
 
@@ -1626,6 +1660,7 @@ local function CreateInputWindow(
         end
     )
 
+
     Cancel.MouseButton1Click:Connect(
         function()
 
@@ -1635,6 +1670,577 @@ local function CreateInputWindow(
     )
 
 end
+
+
+--==================================================
+-- REMOVE PLAYER LIST WINDOW
+--==================================================
+
+local function CreateRemovePlayerWindow()
+
+    local Overlay =
+        Instance.new("Frame")
+
+    Overlay.Name =
+        "RemovePlayerOverlay"
+
+    Overlay.Size =
+        UDim2.new(
+            1,
+            0,
+            1,
+            0
+        )
+
+    Overlay.BackgroundColor3 =
+        Color3.fromRGB(
+            0,
+            0,
+            0
+        )
+
+    Overlay.BackgroundTransparency =
+        0.35
+
+    Overlay.ZIndex =
+        20
+
+    Overlay.Parent =
+        Main
+
+
+    --==================================================
+    -- BOX
+    --==================================================
+
+    local Box =
+        Instance.new("Frame")
+
+    Box.Name =
+        "RemovePlayerBox"
+
+    Box.Size =
+        UDim2.new(
+            0,
+            350,
+            0,
+            350
+        )
+
+    Box.Position =
+        UDim2.new(
+            0.5,
+            -175,
+            0.5,
+            -175
+        )
+
+    Box.BackgroundColor3 =
+        Color3.fromRGB(
+            35,
+            35,
+            45
+        )
+
+    Box.BorderSizePixel =
+        0
+
+    Box.ZIndex =
+        21
+
+    Box.Parent =
+        Overlay
+
+
+    local BoxCorner =
+        Instance.new("UICorner")
+
+    BoxCorner.CornerRadius =
+        UDim.new(
+            0,
+            10
+        )
+
+    BoxCorner.Parent =
+        Box
+
+
+    --==================================================
+    -- TITLE
+    --==================================================
+
+    local Title =
+        Instance.new("TextLabel")
+
+    Title.Size =
+        UDim2.new(
+            1,
+            -20,
+            0,
+            35
+        )
+
+    Title.Position =
+        UDim2.new(
+            0,
+            10,
+            0,
+            10
+        )
+
+    Title.BackgroundTransparency =
+        1
+
+    Title.Text =
+        "REMOVE PLAYER"
+
+    Title.TextColor3 =
+        Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+    Title.Font =
+        Enum.Font.GothamBold
+
+    Title.TextSize =
+        15
+
+    Title.ZIndex =
+        22
+
+    Title.Parent =
+        Box
+
+
+    --==================================================
+    -- SUBTITLE
+    --==================================================
+
+    local Subtitle =
+        Instance.new("TextLabel")
+
+    Subtitle.Size =
+        UDim2.new(
+            1,
+            -20,
+            0,
+            25
+        )
+
+    Subtitle.Position =
+        UDim2.new(
+            0,
+            10,
+            0,
+            42
+        )
+
+    Subtitle.BackgroundTransparency =
+        1
+
+    Subtitle.Text =
+        "Select player to remove"
+
+    Subtitle.TextColor3 =
+        Color3.fromRGB(
+            160,
+            160,
+            175
+        )
+
+    Subtitle.Font =
+        Enum.Font.Gotham
+
+    Subtitle.TextSize =
+        11
+
+    Subtitle.ZIndex =
+        22
+
+    Subtitle.Parent =
+        Box
+
+
+    --==================================================
+    -- PLAYER LIST
+    --==================================================
+
+    local PlayerList =
+        Instance.new("ScrollingFrame")
+
+    PlayerList.Name =
+        "PlayerList"
+
+    PlayerList.Size =
+        UDim2.new(
+            1,
+            -20,
+            0,
+            220
+        )
+
+    PlayerList.Position =
+        UDim2.new(
+            0,
+            10,
+            0,
+            72
+        )
+
+    PlayerList.BackgroundColor3 =
+        Color3.fromRGB(
+            25,
+            25,
+            32
+        )
+
+    PlayerList.BorderSizePixel =
+        0
+
+    PlayerList.ScrollBarThickness =
+        4
+
+    PlayerList.AutomaticCanvasSize =
+        Enum.AutomaticSize.Y
+
+    PlayerList.ZIndex =
+        22
+
+    PlayerList.Parent =
+        Box
+
+
+    local PlayerListCorner =
+        Instance.new("UICorner")
+
+    PlayerListCorner.CornerRadius =
+        UDim.new(
+            0,
+            7
+        )
+
+    PlayerListCorner.Parent =
+        PlayerList
+
+
+    local PlayerLayout =
+        Instance.new("UIListLayout")
+
+    PlayerLayout.Padding =
+        UDim.new(
+            0,
+            5
+        )
+
+    PlayerLayout.SortOrder =
+        Enum.SortOrder.LayoutOrder
+
+    PlayerLayout.Parent =
+        PlayerList
+
+
+    local PlayerPadding =
+        Instance.new("UIPadding")
+
+    PlayerPadding.PaddingTop =
+        UDim.new(
+            0,
+            7
+        )
+
+    PlayerPadding.PaddingLeft =
+        UDim.new(
+            0,
+            7
+        )
+
+    PlayerPadding.PaddingRight =
+        UDim.new(
+            0,
+            7
+        )
+
+    PlayerPadding.PaddingBottom =
+        UDim.new(
+            0,
+            7
+        )
+
+    PlayerPadding.Parent =
+        PlayerList
+
+
+    --==================================================
+    -- CREATE PLAYER ROW
+    --==================================================
+
+    for Index, Username in ipairs(
+        TARGET_USERNAMES
+    ) do
+
+        local PlayerRow =
+            Instance.new("Frame")
+
+        PlayerRow.Name =
+            "Player_" ..
+            Username
+
+        PlayerRow.Size =
+            UDim2.new(
+                1,
+                -5,
+                0,
+                38
+            )
+
+        PlayerRow.BackgroundColor3 =
+            Color3.fromRGB(
+                42,
+                42,
+                52
+            )
+
+        PlayerRow.BorderSizePixel =
+            0
+
+        PlayerRow.LayoutOrder =
+            Index
+
+        PlayerRow.ZIndex =
+            23
+
+        PlayerRow.Parent =
+            PlayerList
+
+
+        local RowCorner =
+            Instance.new("UICorner")
+
+        RowCorner.CornerRadius =
+            UDim.new(
+                0,
+                6
+            )
+
+        RowCorner.Parent =
+            PlayerRow
+
+
+        --==================================================
+        -- USERNAME
+        --==================================================
+
+        local NameLabel =
+            Instance.new("TextLabel")
+
+        NameLabel.Size =
+            UDim2.new(
+                1,
+                -85,
+                1,
+                0
+            )
+
+        NameLabel.Position =
+            UDim2.new(
+                0,
+                10,
+                0,
+                0
+            )
+
+        NameLabel.BackgroundTransparency =
+            1
+
+        NameLabel.Text =
+            Username
+
+        NameLabel.TextColor3 =
+            Color3.fromRGB(
+                255,
+                255,
+                255
+            )
+
+        NameLabel.Font =
+            Enum.Font.GothamBold
+
+        NameLabel.TextSize =
+            12
+
+        NameLabel.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        NameLabel.ZIndex =
+            24
+
+        NameLabel.Parent =
+            PlayerRow
+
+
+        --==================================================
+        -- REMOVE BUTTON
+        --==================================================
+
+        local RemovePlayerButton =
+            Instance.new("TextButton")
+
+        RemovePlayerButton.Size =
+            UDim2.new(
+                0,
+                65,
+                0,
+                28
+            )
+
+        RemovePlayerButton.Position =
+            UDim2.new(
+                1,
+                -72,
+                0.5,
+                -14
+            )
+
+        RemovePlayerButton.BackgroundColor3 =
+            Color3.fromRGB(
+                150,
+                60,
+                60
+            )
+
+        RemovePlayerButton.Text =
+            "REMOVE"
+
+        RemovePlayerButton.TextColor3 =
+            Color3.fromRGB(
+                255,
+                255,
+                255
+            )
+
+        RemovePlayerButton.Font =
+            Enum.Font.GothamBold
+
+        RemovePlayerButton.TextSize =
+            9
+
+        RemovePlayerButton.ZIndex =
+            24
+
+        RemovePlayerButton.Parent =
+            PlayerRow
+
+
+        local RemoveButtonCorner =
+            Instance.new("UICorner")
+
+        RemoveButtonCorner.CornerRadius =
+            UDim.new(
+                0,
+                5
+            )
+
+        RemoveButtonCorner.Parent =
+            RemovePlayerButton
+
+
+        --==================================================
+        -- REMOVE EVENT
+        --==================================================
+
+        RemovePlayerButton.MouseButton1Click:Connect(
+            function()
+
+                RemovePlayer(
+                    Username
+                )
+
+                Overlay:Destroy()
+
+            end
+        )
+
+    end
+
+
+    --==================================================
+    -- CLOSE BUTTON
+    --==================================================
+
+    local Cancel =
+        Instance.new("TextButton")
+
+    Cancel.Size =
+        UDim2.new(
+            1,
+            -20,
+            0,
+            38
+        )
+
+    Cancel.Position =
+        UDim2.new(
+            0,
+            10,
+            1,
+            -48
+        )
+
+    Cancel.Text =
+        "CANCEL"
+
+    Cancel.Font =
+        Enum.Font.GothamBold
+
+    Cancel.TextSize =
+        12
+
+    Cancel.TextColor3 =
+        Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+    Cancel.BackgroundColor3 =
+        Color3.fromRGB(
+            90,
+            90,
+            100
+        )
+
+    Cancel.ZIndex =
+        23
+
+    Cancel.Parent =
+        Box
+
+
+    local CancelCorner =
+        Instance.new("UICorner")
+
+    CancelCorner.CornerRadius =
+        UDim.new(
+            0,
+            7
+        )
+
+    CancelCorner.Parent =
+        Cancel
+
+
+    Cancel.MouseButton1Click:Connect(
+        function()
+
+            Overlay:Destroy()
+
+        end
+    )
+
+end
+
 
 --==================================================
 -- BUTTON EVENTS
@@ -1653,6 +2259,7 @@ StartButton.MouseButton1Click:Connect(
     end
 )
 
+
 StopButton.MouseButton1Click:Connect(
     function()
 
@@ -1665,6 +2272,7 @@ StopButton.MouseButton1Click:Connect(
 
     end
 )
+
 
 AddButton.MouseButton1Click:Connect(
     function()
@@ -1685,32 +2293,29 @@ AddButton.MouseButton1Click:Connect(
     end
 )
 
+
+--==================================================
+-- REMOVE PLAYER
+-- NOW USE LIST WINDOW
+--==================================================
+
 RemoveButton.MouseButton1Click:Connect(
     function()
 
-        CreateInputWindow(
-            "REMOVE PLAYER",
-            function(
-                Username
-            )
-
-                RemovePlayer(
-                    Username
-                )
-
-            end
-        )
+        CreateRemovePlayerWindow()
 
     end
 )
 
+
 --==================================================
--- LOAD HISTORY
+-- LOAD GUI DATA
 --==================================================
 
 LoadHistory()
 
 RefreshHistoryGUI()
+
 
 --==================================================
 -- GET MY PLOT
@@ -1726,9 +2331,13 @@ local function GetMyPlot()
             )
 
         if Plot
-            and Plot:GetAttribute(
+            and
+            Plot:GetAttribute(
                 "Owner"
-            ) == LocalPlayer.Name then
+            )
+            ==
+            LocalPlayer.Name
+        then
 
             return Plot
 
@@ -1740,6 +2349,7 @@ local function GetMyPlot()
 
 end
 
+
 --==================================================
 -- HARVEST
 --==================================================
@@ -1748,6 +2358,7 @@ local function HarvestFruits()
 
     local MyPlot =
         GetMyPlot()
+
 
     if not MyPlot then
 
@@ -1759,21 +2370,28 @@ local function HarvestFruits()
 
     end
 
+
     local Plants =
         MyPlot:FindFirstChild(
             "Plants"
         )
 
+
     if not Plants then
+
         return 0
+
     end
+
 
     local Harvested =
         0
 
+
     for _, Plant in ipairs(
         Plants:GetChildren()
     ) do
+
 
         --==================================================
         -- HARVEST PLANT
@@ -1784,6 +2402,7 @@ local function HarvestFruits()
                 "HarvestPart"
             )
 
+
         if HarvestPart then
 
             local Prompt =
@@ -1791,18 +2410,24 @@ local function HarvestFruits()
                     "HarvestPrompt"
                 )
 
+
             if Prompt
-                and Prompt:IsA(
+                and
+                Prompt:IsA(
                     "ProximityPrompt"
-                ) then
+                )
+            then
 
-                pcall(function()
+                pcall(
+                    function()
 
-                    fireproximityprompt(
-                        Prompt
-                    )
+                        fireproximityprompt(
+                            Prompt
+                        )
 
-                end)
+                    end
+                )
+
 
                 Harvested += 1
 
@@ -1814,6 +2439,7 @@ local function HarvestFruits()
 
         end
 
+
         --==================================================
         -- HARVEST FRUITS
         --==================================================
@@ -1822,6 +2448,7 @@ local function HarvestFruits()
             Plant:FindFirstChild(
                 "Fruits"
             )
+
 
         if Fruits then
 
@@ -1833,25 +2460,32 @@ local function HarvestFruits()
                     Fruit:GetAttribute(
                         "SizeMulti"
                     )
-                    or 1
+                    or
+                    1
+
 
                 local Mutation =
                     Fruit:GetAttribute(
                         "Mutation"
                     )
 
+
                 if SizeMulti >
                     SIZE_THRESHOLD
-                    and not Mutation then
+                    and
+                    not Mutation
+                then
 
                     continue
 
                 end
 
+
                 local CorePartName =
                     Fruit:GetAttribute(
                         "CorePartName"
                     )
+
 
                 if BLACKLIST[
                     CorePartName
@@ -1861,10 +2495,12 @@ local function HarvestFruits()
 
                 end
 
+
                 local FruitHarvestPart =
                     Fruit:FindFirstChild(
                         "HarvestPart"
                     )
+
 
                 if FruitHarvestPart then
 
@@ -1873,18 +2509,24 @@ local function HarvestFruits()
                             "HarvestPrompt"
                         )
 
+
                     if Prompt
-                        and Prompt:IsA(
+                        and
+                        Prompt:IsA(
                             "ProximityPrompt"
-                        ) then
+                        )
+                    then
 
-                        pcall(function()
+                        pcall(
+                            function()
 
-                            fireproximityprompt(
-                                Prompt
-                            )
+                                fireproximityprompt(
+                                    Prompt
+                                )
 
-                        end)
+                            end
+                        )
+
 
                         Harvested += 1
 
@@ -1902,9 +2544,11 @@ local function HarvestFruits()
 
     end
 
+
     return Harvested
 
 end
+
 
 --==================================================
 -- FAVORITE BIG FRUITS
@@ -1916,8 +2560,10 @@ local function FavoriteBigFruits()
         FavoritedFruits
     )
 
+
     local Count =
         0
+
 
     for _, Fruit in ipairs(
         Backpack:GetChildren()
@@ -1928,28 +2574,35 @@ local function FavoriteBigFruits()
                 "Id"
             )
 
+
         local SizeMultiplier =
             Fruit:GetAttribute(
                 "SizeMultiplier"
             )
 
-        if FruitId
-            and SizeMultiplier
-            and SizeMultiplier >
-                SIZE_MULTIPLIER_LIMIT then
 
-            Networking.Backpack
-                .SetFruitFavorite
-                :Fire(
-                    FruitId,
-                    true
-                )
+        if FruitId
+            and
+            SizeMultiplier
+            and
+            SizeMultiplier >
+            SIZE_MULTIPLIER_LIMIT
+        then
+
+            Networking.Backpack.SetFruitFavorite:Fire(
+                FruitId,
+                true
+            )
+
 
             FavoritedFruits[
                 FruitId
-            ] = true
+            ] =
+                true
+
 
             Count += 1
+
 
             task.wait(
                 FAVORITE_DELAY
@@ -1959,9 +2612,11 @@ local function FavoriteBigFruits()
 
     end
 
+
     return Count
 
 end
+
 
 --==================================================
 -- SELL ALL
@@ -1969,19 +2624,16 @@ end
 
 local function SellAll()
 
-    Networking.NPCS
-        .PreviewSellAll
-        :Fire()
+    Networking.NPCS.PreviewSellAll:Fire()
 
     task.wait(
         BEFORE_SELL_DELAY
     )
 
-    Networking.NPCS
-        .SellAll
-        :Fire()
+    Networking.NPCS.SellAll:Fire()
 
 end
+
 
 --==================================================
 -- UNFAVORITE
@@ -1992,18 +2644,19 @@ local function UnfavoriteBigFruits()
     local Count =
         0
 
+
     for FruitId in pairs(
         FavoritedFruits
     ) do
 
-        Networking.Backpack
-            .SetFruitFavorite
-            :Fire(
-                FruitId,
-                false
-            )
+        Networking.Backpack.SetFruitFavorite:Fire(
+            FruitId,
+            false
+        )
+
 
         Count += 1
+
 
         task.wait(
             UNFAVORITE_DELAY
@@ -2011,13 +2664,16 @@ local function UnfavoriteBigFruits()
 
     end
 
+
     table.clear(
         FavoritedFruits
     )
 
+
     return Count
 
 end
+
 
 --==================================================
 -- BUILD BATCH
@@ -2034,70 +2690,88 @@ local function BuildBatch()
     local TotalValue =
         0
 
+
     for _, Item in ipairs(
         Backpack:GetChildren()
     ) do
 
-        if Item:IsA("Tool")
-            or Item:IsA(
-                "Configuration"
-            ) then
+        if Item:IsA(
+            "Tool"
+        )
+        or
+        Item:IsA(
+            "Configuration"
+        )
+        then
 
             local FruitName =
                 Item:GetAttribute(
                     "FruitName"
                 )
 
+
             if FruitName then
 
                 local Success, Value =
-                    pcall(function()
+                    pcall(
+                        function()
 
-                        return FruitValueCalc(
-                            FruitName,
-
-                            Item:GetAttribute(
-                                "SizeMultiplier"
-                            ),
-
-                            Item:GetAttribute(
-                                "Mutation"
-                            ),
-
-                            LocalPlayer,
-
-                            Item:GetAttribute(
-                                "DecayAlpha"
+                            return FruitValueCalc(
+                                FruitName,
+                                Item:GetAttribute(
+                                    "SizeMultiplier"
+                                ),
+                                Item:GetAttribute(
+                                    "Mutation"
+                                ),
+                                LocalPlayer,
+                                Item:GetAttribute(
+                                    "DecayAlpha"
+                                )
                             )
-                        )
 
-                    end)
+                        end
+                    )
+
 
                 if Success
-                    and Value then
+                    and
+                    Value
+                then
 
                     local FruitId =
                         Item:GetAttribute(
                             "FruitId"
                         )
-                        or Item:GetAttribute(
+                        or
+                        Item:GetAttribute(
                             "ItemId"
                         )
-                        or Item:GetAttribute(
+                        or
+                        Item:GetAttribute(
                             "UUID"
                         )
-                        or Item:GetAttribute(
+                        or
+                        Item:GetAttribute(
                             "Id"
                         )
+
 
                     if FruitId then
 
                         table.insert(
                             Fruits,
                             {
-                                Item = Item,
-                                Value = Value,
-                                FruitId = FruitId
+
+                                Item =
+                                    Item,
+
+                                Value =
+                                    Value,
+
+                                FruitId =
+                                    FruitId
+
                             }
                         )
 
@@ -2111,9 +2785,6 @@ local function BuildBatch()
 
     end
 
-    --==================================================
-    -- SORT VALUE TERBESAR
-    --==================================================
 
     table.sort(
         Fruits,
@@ -2128,51 +2799,57 @@ local function BuildBatch()
         end
     )
 
-    --==================================================
-    -- BUILD BATCH
-    --==================================================
 
     for _, Data in ipairs(
         Fruits
     ) do
 
         if #Batch >=
-            MAX_FRUIT_SEND then
+            MAX_FRUIT_SEND
+        then
 
             break
 
         end
+
 
         if TotalValue >=
-            TARGET_VALUE then
+            TARGET_VALUE
+        then
 
             break
 
         end
+
 
         table.insert(
             Batch,
             {
+
                 Category =
                     "HarvestedFruits",
 
                 ItemKey =
                     Data.FruitId,
 
-                Count = 1
+                Count =
+                    1
+
             }
         )
+
 
         TotalValue +=
             Data.Value
 
     end
 
-    return
-        Batch,
+
+    return Batch,
         TotalValue
 
 end
+
 
 --==================================================
 -- GET NEXT TARGET
@@ -2185,11 +2862,16 @@ local function GetNextTarget()
     ) do
 
         local Data =
-            History[Username]
+            History[
+                Username
+            ]
+
 
         if not Data
-            or Data.Status ~=
-                "Sudah kirim" then
+            or
+            Data.Status ~=
+            "Sudah kirim"
+        then
 
             return Username
 
@@ -2197,9 +2879,11 @@ local function GetNextTarget()
 
     end
 
+
     return nil
 
 end
+
 
 --==================================================
 -- RESET HISTORY
@@ -2211,12 +2895,20 @@ local function ResetHistory()
         TARGET_USERNAMES
     ) do
 
-        History[Username] = {
-            Status = "Belum kirim",
-            Value = 0
+        History[
+            Username
+        ] = {
+
+            Status =
+                "Belum kirim",
+
+            Value =
+                0
+
         }
 
     end
+
 
     SaveHistory()
 
@@ -2224,39 +2916,6 @@ local function ResetHistory()
 
 end
 
---==================================================
--- COUNT FRUIT
---==================================================
-
-local function CountFruits()
-
-    local FruitCount =
-        0
-
-    for _, Item in ipairs(
-        Backpack:GetChildren()
-    ) do
-
-        if Item:IsA("Tool")
-            or Item:IsA(
-                "Configuration"
-            ) then
-
-            if Item:GetAttribute(
-                "FruitName"
-            ) then
-
-                FruitCount += 1
-
-            end
-
-        end
-
-    end
-
-    return FruitCount
-
-end
 
 --==================================================
 -- SEND TO TARGET
@@ -2267,22 +2926,28 @@ local function SendToTarget(
 )
 
     SetStep(
-        "Getting UserId: "
-        .. TargetUsername
+        "Getting UserId: " ..
+        TargetUsername
     )
+
 
     local SuccessUserId,
         TargetUserId =
-        pcall(function()
+        pcall(
+            function()
 
-            return Players:GetUserIdFromNameAsync(
-                TargetUsername
-            )
+                return Players:GetUserIdFromNameAsync(
+                    TargetUsername
+                )
 
-        end)
+            end
+        )
+
 
     if not SuccessUserId
-        or not TargetUserId then
+        or
+        not TargetUserId
+    then
 
         warn(
             "UserId gagal:",
@@ -2293,17 +2958,16 @@ local function SendToTarget(
 
     end
 
-    if not Running then
-        return false
-    end
 
     SetStep(
         "Building Trade Batch"
     )
 
+
     local Batch,
         TotalValue =
         BuildBatch()
+
 
     if #Batch == 0 then
 
@@ -2315,36 +2979,35 @@ local function SendToTarget(
 
     end
 
+
     SetStep(
-        "Sending "
-        .. #Batch
-        .. " Fruit -> "
-        .. TargetUsername
+        "Sending " ..
+        #Batch ..
+        " Fruit -> " ..
+        TargetUsername
     )
 
-    local SuccessSend =
-        pcall(function()
 
-            Networking.Mailbox
-                .SendBatch
-                :Fire(
+    local SuccessSend =
+        pcall(
+            function()
+
+                Networking.Mailbox.SendBatch:Fire(
                     TargetUserId,
                     Batch,
                     NOTE
                 )
 
-        end)
+            end
+        )
+
 
     if not SuccessSend then
-
-        warn(
-            "[AUTO SEND] Send gagal:",
-            TargetUsername
-        )
 
         return false
 
     end
+
 
     --==================================================
     -- SAVE VALUE
@@ -2362,9 +3025,11 @@ local function SendToTarget(
 
     }
 
+
     SaveHistory()
 
     RefreshHistoryGUI()
+
 
     print(
         "[AUTO SEND] SUCCESS",
@@ -2373,9 +3038,11 @@ local function SendToTarget(
         TotalValue
     )
 
+
     return true
 
 end
+
 
 --==================================================
 -- AUTO SEND
@@ -2386,9 +3053,6 @@ local function RunAutoSend()
     local TargetUsername =
         GetNextTarget()
 
-    --==================================================
-    -- ALL PLAYER SENT
-    --==================================================
 
     if not TargetUsername then
 
@@ -2396,235 +3060,56 @@ local function RunAutoSend()
             "All Players Sent - Resetting"
         )
 
+
         task.wait(
             1
         )
 
+
         ResetHistory()
+
 
         TargetUsername =
             GetNextTarget()
 
     end
 
+
     if not TargetUsername then
+
         return
+
     end
+
 
     SetStep(
-        "Checking Fruit -> "
-        .. TargetUsername
-    )
-
-    local FruitCount =
-        CountFruits()
-
-    if FruitCount <
-        MAX_FRUIT_SEND then
-
-        SetStep(
-            "Waiting Fruit: "
-            .. FruitCount
-            .. "/"
-            .. MAX_FRUIT_SEND
-        )
-
-        return
-
-    end
-
-    SendToTarget(
+        "Checking Fruit -> " ..
         TargetUsername
     )
 
-end
 
---==================================================
--- MAIN LOOP
--- AUTO START
---==================================================
+    local FruitCount =
+        0
 
-task.spawn(function()
 
-    Running =
-        true
+    for _, Item in ipairs(
+        Backpack:GetChildren()
+    ) do
 
-    SetStep(
-        "AUTO START"
-    )
-
-    task.wait(
-        1
-    )
-
-    while true do
-
-        --==================================================
-        -- STOP CHECK
-        --==================================================
-
-        while not Running do
-
-            task.wait(
-                0.5
-            )
-
-        end
-
-        --==================================================
-        -- STEP 1
-        --==================================================
-
-        SetStep(
-            "1/5 Harvest"
+        if Item:IsA(
+            "Tool"
         )
-
-        local HarvestedCount =
-            HarvestFruits()
-
-        task.wait(
-            AFTER_HARVEST_DELAY
+        or
+        Item:IsA(
+            "Configuration"
         )
+        then
 
-        --==================================================
-        -- STOP CHECK
-        --==================================================
-
-        if not Running then
-            continue
-        end
-
-        --==================================================
-        -- STEP 2
-        --==================================================
-
-        SetStep(
-            "2/5 Favorite Big Fruits"
-        )
-
-        local FavoritedCount =
-            FavoriteBigFruits()
-
-        task.wait(
-            BEFORE_SELL_DELAY
-        )
-
-        --==================================================
-        -- STOP CHECK
-        --==================================================
-
-        if not Running then
-            continue
-        end
-
-        --==================================================
-        -- STEP 3
-        --==================================================
-
-        SetStep(
-            "3/5 Sell All"
-        )
-
-        SellAll()
-
-        task.wait(
-            AFTER_SELL_DELAY
-        )
-
-        --==================================================
-        -- STOP CHECK
-        --==================================================
-
-        if not Running then
-            continue
-        end
-
-        --==================================================
-        -- STEP 4
-        --==================================================
-
-        SetStep(
-            "4/5 Unfavorite"
-        )
-
-        UnfavoriteBigFruits()
-
-        --==================================================
-        -- STOP CHECK
-        --==================================================
-
-        if not Running then
-            continue
-        end
-
-        --==================================================
-        -- STEP 5
-        --==================================================
-
-        SetStep(
-            "5/5 Auto Send"
-        )
-
-        RunAutoSend()
-
-        --==================================================
-        -- CYCLE FINISH
-        --==================================================
-
-        SetStep(
-            "Cycle Complete | Harvest: "
-            .. HarvestedCount
-            .. " | Favorite: "
-            .. FavoritedCount
-        )
-
-        task.wait(
-            LOOP_DELAY
-        )
-
-    end
-
-end)
-
---==================================================
--- REALTIME HISTORY REFRESH
---==================================================
-
-task.spawn(function()
-
-    while ScreenGui.Parent do
-
-        task.wait(
-            HISTORY_REFRESH_DELAY
-        )
-
-        -- Reload JSON supaya GUI
-        -- mengikuti perubahan file realtime
-
-        if IsFileAPIAvailable()
-            and isfile(
-                HISTORY_FILE
+            if Item:GetAttribute(
+                "FruitName"
             ) then
 
-            local Success, Data =
-                pcall(function()
-
-                    return HttpService:JSONDecode(
-                        readfile(
-                            HISTORY_FILE
-                        )
-                    )
-
-                end)
-
-            if Success
-                and type(Data) ==
-                    "table" then
-
-                History =
-                    Data
-
-                RefreshHistoryGUI()
+                FruitCount += 1
 
             end
 
@@ -2632,7 +3117,194 @@ task.spawn(function()
 
     end
 
-end)
+
+    if FruitCount <
+        MAX_FRUIT_SEND
+    then
+
+        SetStep(
+            "Waiting Fruit: " ..
+            FruitCount ..
+            "/" ..
+            MAX_FRUIT_SEND
+        )
+
+        return
+
+    end
+
+
+    SendToTarget(
+        TargetUsername
+    )
+
+end
+
+
+--==================================================
+-- MAIN LOOP
+-- AUTO START
+--==================================================
+
+task.spawn(
+    function()
+
+        Running =
+            true
+
+
+        SetStep(
+            "AUTO START"
+        )
+
+
+        task.wait(
+            1
+        )
+
+
+        while true do
+
+
+            --==================================================
+            -- STOP CHECK
+            --==================================================
+
+            while not Running do
+
+                task.wait(
+                    0.5
+                )
+
+            end
+
+
+            --==================================================
+            -- STEP 1
+            --==================================================
+
+            SetStep(
+                "1/5 Harvest"
+            )
+
+
+            local HarvestedCount =
+                HarvestFruits()
+
+
+            task.wait(
+                AFTER_HARVEST_DELAY
+            )
+
+
+            --==================================================
+            -- STEP 2
+            --==================================================
+
+            if not Running then
+
+                continue
+
+            end
+
+
+            SetStep(
+                "2/5 Favorite Big Fruits"
+            )
+
+
+            local FavoritedCount =
+                FavoriteBigFruits()
+
+
+            task.wait(
+                BEFORE_SELL_DELAY
+            )
+
+
+            --==================================================
+            -- STEP 3
+            --==================================================
+
+            if not Running then
+
+                continue
+
+            end
+
+
+            SetStep(
+                "3/5 Sell All"
+            )
+
+
+            SellAll()
+
+
+            task.wait(
+                AFTER_SELL_DELAY
+            )
+
+
+            --==================================================
+            -- STEP 4
+            --==================================================
+
+            if not Running then
+
+                continue
+
+            end
+
+
+            SetStep(
+                "4/5 Unfavorite"
+            )
+
+
+            UnfavoriteBigFruits()
+
+
+            --==================================================
+            -- STEP 5
+            --==================================================
+
+            if not Running then
+
+                continue
+
+            end
+
+
+            SetStep(
+                "5/5 Auto Send"
+            )
+
+
+            RunAutoSend()
+
+
+            --==================================================
+            -- CYCLE FINISH
+            --==================================================
+
+            SetStep(
+                "Cycle Complete | Harvest: " ..
+                HarvestedCount ..
+                " | Favorite: " ..
+                FavoritedCount
+            )
+
+
+            task.wait(
+                LOOP_DELAY
+            )
+
+        end
+
+    end
+)
+
 
 --==================================================
 -- DRAG GUI
@@ -2645,13 +3317,15 @@ local DragStart
 
 local StartPosition
 
+
 Header.InputBegan:Connect(
     function(
         Input
     )
 
         if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
+            Enum.UserInputType.MouseButton1
+        then
 
             Dragging =
                 true
@@ -2667,31 +3341,35 @@ Header.InputBegan:Connect(
     end
 )
 
+
 UserInputService.InputChanged:Connect(
     function(
         Input
     )
 
         if Dragging
-            and Input.UserInputType ==
-                Enum.UserInputType.MouseMovement then
+            and
+            Input.UserInputType ==
+            Enum.UserInputType.MouseMovement
+        then
 
             local Delta =
-                Input.Position
-                - DragStart
+                Input.Position -
+                DragStart
+
 
             Main.Position =
                 UDim2.new(
 
                     StartPosition.X.Scale,
 
-                    StartPosition.X.Offset
-                    + Delta.X,
+                    StartPosition.X.Offset +
+                    Delta.X,
 
                     StartPosition.Y.Scale,
 
-                    StartPosition.Y.Offset
-                    + Delta.Y
+                    StartPosition.Y.Offset +
+                    Delta.Y
 
                 )
 
@@ -2700,13 +3378,15 @@ UserInputService.InputChanged:Connect(
     end
 )
 
+
 UserInputService.InputEnded:Connect(
     function(
         Input
     )
 
         if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
+            Enum.UserInputType.MouseButton1
+        then
 
             Dragging =
                 false
@@ -2716,14 +3396,9 @@ UserInputService.InputEnded:Connect(
     end
 )
 
---==================================================
--- INITIAL REFRESH
---==================================================
-
-RefreshHistoryGUI()
 
 --==================================================
--- START
+-- START MESSAGE
 --==================================================
 
 print(
@@ -2739,8 +3414,7 @@ print(
 )
 
 print(
-    "[HARVEST TRADE GUI] HISTORY FILE = "
-    .. HISTORY_FILE
+    "[HARVEST TRADE GUI] REMOVE PLAYER = LIST MODE"
 )
 
 print(
