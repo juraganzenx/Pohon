@@ -1,326 +1,164 @@
--- HARVEST + SELL FRUIT LOOP
--- URUTAN:
+--==================================================
+-- HARVEST + SELL + AUTO SEND
+-- MODERN GUI V2
+--
+-- AUTO START VERSION
+--
+-- FLOW:
 -- 1. HARVEST
 -- 2. FAVORITE FRUIT SizeMultiplier > 8
 -- 3. SELL ALL
--- 4. UNFAVORITE KEMBALI
--- 5. ULANGI TERUS
+-- 4. UNFAVORITE
+-- 5. AUTO SEND
+-- 6. REPEAT
+--
+-- GUI:
+-- - AUTO START
+-- - START / STOP
+-- - CYCLE
+-- - CURRENT STEP
+-- - HARVEST COUNT
+-- - FAVORITE COUNT
+-- - BACKPACK FRUIT
+-- - SEND TARGET
+-- - SEND VALUE
+-- - TRADE HISTORY
+-- - ADD USERNAME
+-- - REMOVE USERNAME
+-- - REALTIME LOG
+--
+-- TRADE HISTORY FORMAT:
+--
+-- {
+--     ["Username"] = {
+--         Status = "Sudah kirim",
+--         Value = 1000000000,
+--         FruitCount = 20
+--     }
+-- }
+--==================================================
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local LocalPlayer = Players.LocalPlayer
-local Networking = require(ReplicatedStorage.SharedModules.Networking)
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
 
-local Gardens = workspace:WaitForChild("Gardens")
-local Backpack = LocalPlayer:WaitForChild("Backpack")
+local Players =
+    game:GetService("Players")
+
+local ReplicatedStorage =
+    game:GetService("ReplicatedStorage")
+
+local HttpService =
+    game:GetService("HttpService")
+
+local UserInputService =
+    game:GetService("UserInputService")
+
+
+--------------------------------------------------
+-- PLAYER
+--------------------------------------------------
+
+local LocalPlayer =
+    Players.LocalPlayer
+
+
+--------------------------------------------------
+-- MODULES
+--------------------------------------------------
+
+local Networking =
+    require(
+        ReplicatedStorage.SharedModules.Networking
+    )
+
+local FruitValueCalc =
+    require(
+        ReplicatedStorage.SharedModules.FruitValueCalc
+    )
+
+local NumberUtils =
+    require(
+        ReplicatedStorage.SharedModules.NumberUtils
+    )
+
+
+--------------------------------------------------
+-- REFERENCES
+--------------------------------------------------
+
+local Gardens =
+    workspace:WaitForChild(
+        "Gardens"
+    )
+
+local Backpack =
+    LocalPlayer:WaitForChild(
+        "Backpack"
+    )
+
+local PlayerGui =
+    LocalPlayer:WaitForChild(
+        "PlayerGui"
+    )
+
 
 --------------------------------------------------
 -- CONFIG
 --------------------------------------------------
 
--- SELL
-local SIZE_MULTIPLIER_LIMIT = 8
+local SIZE_MULTIPLIER_LIMIT =
+    8
 
-local FAVORITE_DELAY = 0.05
-local BEFORE_SELL_DELAY = 1
-local AFTER_SELL_DELAY = 1
-local UNFAVORITE_DELAY = 0.05
+local FAVORITE_DELAY =
+    0.05
 
--- Jeda setelah harvest selesai
-local AFTER_HARVEST_DELAY = 1
+local BEFORE_SELL_DELAY =
+    1
 
--- Jeda sebelum siklus berikutnya
-local LOOP_DELAY = 2
+local AFTER_SELL_DELAY =
+    1
 
--- HARVEST
-local SIZE_THRESHOLD = 8
+local UNFAVORITE_DELAY =
+    0.05
 
--- Blacklist Fruit berdasarkan CorePartName
-local BLACKLIST = {
-    NAMEFRUIT = true,
-}
+local AFTER_HARVEST_DELAY =
+    1
 
---------------------------------------------------
--- DAFTAR FRUIT YANG DI-FAVORITE
--- PADA SIKLUS SAAT INI
---------------------------------------------------
+local LOOP_DELAY =
+    2
 
-local FavoritedFruits = {}
+local SIZE_THRESHOLD =
+    8
+
 
 --------------------------------------------------
--- CARI PLOT MILIK PLAYER
+-- AUTO SEND CONFIG
 --------------------------------------------------
 
-local function GetMyPlot()
+local HISTORY_FILE =
+    "TradeHistory.json"
 
-    for i = 1, 8 do
+local NOTE =
+    "Fruit Gift 10000 Value"
 
-        local Plot = Gardens:FindFirstChild("Plot" .. i)
+local TARGET_VALUE =
+    1000000000
 
-        if Plot and Plot:GetAttribute("Owner") == LocalPlayer.Name then
-            return Plot
-        end
+local MAX_FRUIT_SEND =
+    20
 
-    end
-
-    return nil
-end
 
 --------------------------------------------------
--- HARVEST SEMUA YANG MEMENUHI SYARAT
+-- DEFAULT USERNAME
+--------------------------------------------------
+-- Username awal.
+-- Setelah itu bisa ditambah / dihapus
+-- langsung dari GUI.
 --------------------------------------------------
 
-local function HarvestFruits()
-
-    local MyPlot = GetMyPlot()
-
-    if not MyPlot then
-        warn("❌ Plot milikmu tidak ditemukan!")
-        return 0
-    end
-
-    local Plants = MyPlot:FindFirstChild("Plants")
-
-    if not Plants then
-        warn("❌ Folder Plants tidak ditemukan!")
-        return 0
-    end
-
-    local harvested = 0
-    local plantCount = 0
-
-    for _, Plant in ipairs(Plants:GetChildren()) do
-
-        plantCount += 1
-
-        --------------------------------------------------
-        -- HARVEST PLANT
-        --------------------------------------------------
-
-        local HarvestPart = Plant:FindFirstChild("HarvestPart")
-
-        if HarvestPart then
-
-            local HarvestPrompt = HarvestPart:FindFirstChild("HarvestPrompt")
-
-            if HarvestPrompt
-                and HarvestPrompt:IsA("ProximityPrompt")
-            then
-
-                pcall(function()
-                    fireproximityprompt(HarvestPrompt)
-                end)
-
-                harvested += 1
-
-                task.wait(0.001)
-
-            end
-
-        end
-
-        --------------------------------------------------
-        -- HARVEST FRUITS
-        --------------------------------------------------
-
-        local Fruits = Plant:FindFirstChild("Fruits")
-
-        if Fruits then
-
-            for _, Fruit in ipairs(Fruits:GetChildren()) do
-
-                --------------------------------------------------
-                -- CEK SIZE MULTI
-                --------------------------------------------------
-
-                local SizeMulti = Fruit:GetAttribute("SizeMulti") or 1
-
-                --------------------------------------------------
-                -- CEK MUTATION
-                --------------------------------------------------
-
-                local Mutation = Fruit:GetAttribute("Mutation")
-
-                -- Buah SizeMulti > 8 harus menunggu Mutation
-                if SizeMulti > SIZE_THRESHOLD and not Mutation then
-                    continue
-                end
-
-                --------------------------------------------------
-                -- BLACKLIST
-                --------------------------------------------------
-
-                local CorePartName = Fruit:GetAttribute("CorePartName")
-
-                if BLACKLIST[CorePartName] then
-                    continue
-                end
-
-                --------------------------------------------------
-                -- HARVEST
-                --------------------------------------------------
-
-                local FruitHarvestPart = Fruit:FindFirstChild("HarvestPart")
-
-                if FruitHarvestPart then
-
-                    local FruitPrompt =
-                        FruitHarvestPart:FindFirstChild("HarvestPrompt")
-
-                    if FruitPrompt
-                        and FruitPrompt:IsA("ProximityPrompt")
-                    then
-
-                        pcall(function()
-                            fireproximityprompt(FruitPrompt)
-                        end)
-
-                        harvested += 1
-
-                        task.wait(0.001)
-
-                    end
-
-                end
-
-            end
-
-        end
-
-    end
-
-    print(string.format(
-        "🌱 [%s] Harvest selesai | Plants: %d | Total Harvest: %d",
-        MyPlot.Name,
-        plantCount,
-        harvested
-    ))
-
-    return harvested
-end
-
---------------------------------------------------
--- FAVORITE SEMUA FRUIT
--- SizeMultiplier > 8
---------------------------------------------------
-
-local function FavoriteBigFruits()
-
-    local count = 0
-
-    -- Bersihkan daftar dari siklus sebelumnya
-    table.clear(FavoritedFruits)
-
-    --------------------------------------------------
-    -- SCAN BACKPACK
-    --------------------------------------------------
-
-    for _, Fruit in ipairs(Backpack:GetChildren()) do
-
-        local FruitId = Fruit:GetAttribute("Id")
-        local SizeMultiplier = Fruit:GetAttribute("SizeMultiplier")
-
-        if FruitId
-            and SizeMultiplier
-            and SizeMultiplier > SIZE_MULTIPLIER_LIMIT
-        then
-
-            Networking.Backpack.SetFruitFavorite:Fire(
-                FruitId,
-                true
-            )
-
-            --------------------------------------------------
-            -- SIMPAN ID
-            --------------------------------------------------
-
-            FavoritedFruits[FruitId] = true
-
-            count += 1
-
-            task.wait(FAVORITE_DELAY)
-
-        end
-
-    end
-
-    print(
-        "[SELL LOOP] Favorite:",
-        count,
-        "fruit dengan SizeMultiplier >",
-        SIZE_MULTIPLIER_LIMIT
-    )
-
-    return count
-end
-
---------------------------------------------------
--- SELL ALL
---------------------------------------------------
-
-local function SellAll()
-
-    print("[SELL LOOP] PreviewSellAll")
-
-    Networking.NPCS.PreviewSellAll:Fire()
-
-    task.wait(BEFORE_SELL_DELAY)
-
-    print("[SELL LOOP] SellAll")
-
-    Networking.NPCS.SellAll:Fire()
-
-end
-
---------------------------------------------------
--- UNFAVORITE FRUIT YANG TADI DI-FAVORITE
---------------------------------------------------
-
-local function UnfavoriteBigFruits()
-
-    local count = 0
-
-    for FruitId in pairs(FavoritedFruits) do
-
-        Networking.Backpack.SetFruitFavorite:Fire(
-            FruitId,
-            false
-        )
-
-        count += 1
-
-        task.wait(UNFAVORITE_DELAY)
-
-    end
-
-    print(
-        "[SELL LOOP] Unfavorite:",
-        count,
-        "fruit"
-    )
-
-    table.clear(FavoritedFruits)
-
-end
-
---------------------------------------------------
--- AUTO SEND FRUIT
---------------------------------------------------
-
-local HttpService = game:GetService("HttpService")
-
-local FruitValueCalc =
-    require(ReplicatedStorage.SharedModules.FruitValueCalc)
-
-local NumberUtils =
-    require(ReplicatedStorage.SharedModules.NumberUtils)
-
---------------------------------------------------
--- CONFIG AUTO SEND
---------------------------------------------------
-
-local TARGET_USERNAMES = {
+local DEFAULT_USERNAMES = {
 
     "SD214A",
     "FLK41H",
@@ -334,19 +172,1527 @@ local TARGET_USERNAMES = {
 
 }
 
-local HISTORY_FILE = "TradeHistory.json"
-
-local NOTE =
-    "Fruit Gift 10000 Value"
-
-local TARGET_VALUE =
-    1000000000
-
-local MAX_FRUIT_SEND =
-    20
 
 --------------------------------------------------
--- CHECK FILE API
+-- BLACKLIST
+--------------------------------------------------
+
+local BLACKLIST = {
+
+    NAMEFRUIT = true
+
+}
+
+
+--------------------------------------------------
+-- STATE
+--------------------------------------------------
+
+local Running =
+    false
+
+local Cycle =
+    0
+
+local CurrentStep =
+    "Idle"
+
+local CurrentTarget =
+    "-"
+
+local LastHarvestCount =
+    0
+
+local LastFavoriteCount =
+    0
+
+local LastSendCount =
+    0
+
+local LastSendValue =
+    0
+
+local FavoritedFruits =
+    {}
+
+local CurrentHistory =
+    {}
+
+
+--------------------------------------------------
+-- DESTROY OLD GUI
+--------------------------------------------------
+
+local OldGui =
+    PlayerGui:FindFirstChild(
+        "HarvestSellAutoSendGUI"
+    )
+
+if OldGui then
+
+    OldGui:Destroy()
+
+end
+
+
+--------------------------------------------------
+-- CREATE GUI
+--------------------------------------------------
+
+local ScreenGui =
+    Instance.new(
+        "ScreenGui"
+    )
+
+ScreenGui.Name =
+    "HarvestSellAutoSendGUI"
+
+ScreenGui.ResetOnSpawn =
+    false
+
+ScreenGui.ZIndexBehavior =
+    Enum.ZIndexBehavior.Sibling
+
+ScreenGui.Parent =
+    PlayerGui
+
+
+--------------------------------------------------
+-- MAIN FRAME
+--------------------------------------------------
+
+local Main =
+    Instance.new(
+        "Frame"
+    )
+
+Main.Size =
+    UDim2.new(
+        0,
+        720,
+        0,
+        570
+    )
+
+Main.Position =
+    UDim2.new(
+        0.5,
+        -360,
+        0.5,
+        -285
+    )
+
+Main.BackgroundColor3 =
+    Color3.fromRGB(
+        20,
+        20,
+        25
+    )
+
+Main.BorderSizePixel =
+    0
+
+Main.Parent =
+    ScreenGui
+
+
+--------------------------------------------------
+-- MAIN CORNER
+--------------------------------------------------
+
+local MainCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+MainCorner.CornerRadius =
+    UDim.new(
+        0,
+        12
+    )
+
+MainCorner.Parent =
+    Main
+
+
+--------------------------------------------------
+-- TITLE
+--------------------------------------------------
+
+local Title =
+    Instance.new(
+        "TextLabel"
+    )
+
+Title.Size =
+    UDim2.new(
+        1,
+        -30,
+        0,
+        40
+    )
+
+Title.Position =
+    UDim2.new(
+        0,
+        15,
+        0,
+        8
+    )
+
+Title.BackgroundTransparency =
+    1
+
+Title.Text =
+    "🌱 HARVEST • SELL • AUTO SEND"
+
+Title.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+Title.TextSize =
+    20
+
+Title.Font =
+    Enum.Font.GothamBold
+
+Title.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+Title.Parent =
+    Main
+
+
+--------------------------------------------------
+-- STATUS
+--------------------------------------------------
+
+local Status =
+    Instance.new(
+        "TextLabel"
+    )
+
+Status.Size =
+    UDim2.new(
+        0,
+        250,
+        0,
+        30
+    )
+
+Status.Position =
+    UDim2.new(
+        0,
+        18,
+        0,
+        50
+    )
+
+Status.BackgroundTransparency =
+    1
+
+Status.Text =
+    "🔴 STOPPED"
+
+Status.TextColor3 =
+    Color3.fromRGB(
+        255,
+        80,
+        80
+    )
+
+Status.TextSize =
+    15
+
+Status.Font =
+    Enum.Font.GothamBold
+
+Status.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+Status.Parent =
+    Main
+
+
+--------------------------------------------------
+-- START BUTTON
+--------------------------------------------------
+
+local StartButton =
+    Instance.new(
+        "TextButton"
+    )
+
+StartButton.Size =
+    UDim2.new(
+        0,
+        110,
+        0,
+        35
+    )
+
+StartButton.Position =
+    UDim2.new(
+        1,
+        -245,
+        0,
+        12
+    )
+
+StartButton.BackgroundColor3 =
+    Color3.fromRGB(
+        40,
+        170,
+        90
+    )
+
+StartButton.Text =
+    "▶ START"
+
+StartButton.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+StartButton.TextSize =
+    14
+
+StartButton.Font =
+    Enum.Font.GothamBold
+
+StartButton.Parent =
+    Main
+
+
+local StartCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+StartCorner.CornerRadius =
+    UDim.new(
+        0,
+        8
+    )
+
+StartCorner.Parent =
+    StartButton
+
+
+--------------------------------------------------
+-- STOP BUTTON
+--------------------------------------------------
+
+local StopButton =
+    Instance.new(
+        "TextButton"
+    )
+
+StopButton.Size =
+    UDim2.new(
+        0,
+        110,
+        0,
+        35
+    )
+
+StopButton.Position =
+    UDim2.new(
+        1,
+        -125,
+        0,
+        12
+    )
+
+StopButton.BackgroundColor3 =
+    Color3.fromRGB(
+        190,
+        55,
+        55
+    )
+
+StopButton.Text =
+    "■ STOP"
+
+StopButton.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+StopButton.TextSize =
+    14
+
+StopButton.Font =
+    Enum.Font.GothamBold
+
+StopButton.Parent =
+    Main
+
+
+local StopCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+StopCorner.CornerRadius =
+    UDim.new(
+        0,
+        8
+    )
+
+StopCorner.Parent =
+    StopButton
+
+
+--------------------------------------------------
+-- CURRENT STEP
+--------------------------------------------------
+
+local StepLabel =
+    Instance.new(
+        "TextLabel"
+    )
+
+StepLabel.Size =
+    UDim2.new(
+        1,
+        -30,
+        0,
+        30
+    )
+
+StepLabel.Position =
+    UDim2.new(
+        0,
+        18,
+        0,
+        80
+    )
+
+StepLabel.BackgroundTransparency =
+    1
+
+StepLabel.Text =
+    "Current Step: Idle"
+
+StepLabel.TextColor3 =
+    Color3.fromRGB(
+        220,
+        220,
+        220
+    )
+
+StepLabel.TextSize =
+    14
+
+StepLabel.Font =
+    Enum.Font.Gotham
+
+StepLabel.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+StepLabel.Parent =
+    Main
+
+
+--------------------------------------------------
+-- INFO PANEL
+--------------------------------------------------
+
+local InfoFrame =
+    Instance.new(
+        "Frame"
+    )
+
+InfoFrame.Size =
+    UDim2.new(
+        0,
+        330,
+        0,
+        125
+    )
+
+InfoFrame.Position =
+    UDim2.new(
+        0,
+        15,
+        0,
+        115
+    )
+
+InfoFrame.BackgroundColor3 =
+    Color3.fromRGB(
+        28,
+        28,
+        35
+    )
+
+InfoFrame.BorderSizePixel =
+    0
+
+InfoFrame.Parent =
+    Main
+
+
+local InfoCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+InfoCorner.CornerRadius =
+    UDim.new(
+        0,
+        8
+    )
+
+InfoCorner.Parent =
+    InfoFrame
+
+
+--------------------------------------------------
+-- INFO LABEL
+--------------------------------------------------
+
+local InfoLabel =
+    Instance.new(
+        "TextLabel"
+    )
+
+InfoLabel.Size =
+    UDim2.new(
+        1,
+        -20,
+        1,
+        -15
+    )
+
+InfoLabel.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        8
+    )
+
+InfoLabel.BackgroundTransparency =
+    1
+
+InfoLabel.Text =
+    "Cycle: 0\n" ..
+    "Harvest: 0\n" ..
+    "Favorited: 0\n" ..
+    "Fruit Backpack: 0\n" ..
+    "Send Count: 0\n" ..
+    "Send Value: 0"
+
+InfoLabel.TextColor3 =
+    Color3.fromRGB(
+        230,
+        230,
+        230
+    )
+
+InfoLabel.TextSize =
+    14
+
+InfoLabel.Font =
+    Enum.Font.Gotham
+
+InfoLabel.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+InfoLabel.TextYAlignment =
+    Enum.TextYAlignment.Top
+
+InfoLabel.Parent =
+    InfoFrame
+
+
+--------------------------------------------------
+-- SEND PANEL
+--------------------------------------------------
+
+local SendFrame =
+    Instance.new(
+        "Frame"
+    )
+
+SendFrame.Size =
+    UDim2.new(
+        0,
+        350,
+        0,
+        125
+    )
+
+SendFrame.Position =
+    UDim2.new(
+        0,
+        355,
+        0,
+        115
+    )
+
+SendFrame.BackgroundColor3 =
+    Color3.fromRGB(
+        28,
+        28,
+        35
+    )
+
+SendFrame.BorderSizePixel =
+    0
+
+SendFrame.Parent =
+    Main
+
+
+local SendCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+SendCorner.CornerRadius =
+    UDim.new(
+        0,
+        8
+    )
+
+SendCorner.Parent =
+    SendFrame
+
+
+--------------------------------------------------
+-- SEND LABEL
+--------------------------------------------------
+
+local SendLabel =
+    Instance.new(
+        "TextLabel"
+    )
+
+SendLabel.Size =
+    UDim2.new(
+        1,
+        -20,
+        1,
+        -15
+    )
+
+SendLabel.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        8
+    )
+
+SendLabel.BackgroundTransparency =
+    1
+
+SendLabel.Text =
+    "AUTO SEND\n\n" ..
+    "Target: -\n" ..
+    "Status: Waiting\n" ..
+    "Value: 0"
+
+SendLabel.TextColor3 =
+    Color3.fromRGB(
+        230,
+        230,
+        230
+    )
+
+SendLabel.TextSize =
+    14
+
+SendLabel.Font =
+    Enum.Font.Gotham
+
+SendLabel.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+SendLabel.TextYAlignment =
+    Enum.TextYAlignment.Top
+
+SendLabel.Parent =
+    SendFrame
+
+
+--------------------------------------------------
+-- HISTORY TITLE
+--------------------------------------------------
+
+local HistoryTitle =
+    Instance.new(
+        "TextLabel"
+    )
+
+HistoryTitle.Size =
+    UDim2.new(
+        0,
+        330,
+        0,
+        30
+    )
+
+HistoryTitle.Position =
+    UDim2.new(
+        0,
+        15,
+        0,
+        250
+    )
+
+HistoryTitle.BackgroundTransparency =
+    1
+
+HistoryTitle.Text =
+    "📜 TRADE HISTORY"
+
+HistoryTitle.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+HistoryTitle.TextSize =
+    15
+
+HistoryTitle.Font =
+    Enum.Font.GothamBold
+
+HistoryTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+HistoryTitle.Parent =
+    Main
+
+
+--------------------------------------------------
+-- ADD USERNAME BUTTON
+--------------------------------------------------
+
+local AddButton =
+    Instance.new(
+        "TextButton"
+    )
+
+AddButton.Size =
+    UDim2.new(
+        0,
+        75,
+        0,
+        28
+    )
+
+AddButton.Position =
+    UDim2.new(
+        0,
+        190,
+        0,
+        248
+    )
+
+AddButton.BackgroundColor3 =
+    Color3.fromRGB(
+        40,
+        160,
+        90
+    )
+
+AddButton.Text =
+    "＋ ADD"
+
+AddButton.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+AddButton.TextSize =
+    12
+
+AddButton.Font =
+    Enum.Font.GothamBold
+
+AddButton.Parent =
+    Main
+
+
+local AddCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+AddCorner.CornerRadius =
+    UDim.new(
+        0,
+        6
+    )
+
+AddCorner.Parent =
+    AddButton
+
+
+--------------------------------------------------
+-- REMOVE USERNAME BUTTON
+--------------------------------------------------
+
+local RemoveButton =
+    Instance.new(
+        "TextButton"
+    )
+
+RemoveButton.Size =
+    UDim2.new(
+        0,
+        75,
+        0,
+        28
+    )
+
+RemoveButton.Position =
+    UDim2.new(
+        0,
+        270,
+        0,
+        248
+    )
+
+RemoveButton.BackgroundColor3 =
+    Color3.fromRGB(
+        180,
+        55,
+        55
+    )
+
+RemoveButton.Text =
+    "🗑 REMOVE"
+
+RemoveButton.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+RemoveButton.TextSize =
+    11
+
+RemoveButton.Font =
+    Enum.Font.GothamBold
+
+RemoveButton.Parent =
+    Main
+
+
+local RemoveCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+RemoveCorner.CornerRadius =
+    UDim.new(
+        0,
+        6
+    )
+
+RemoveCorner.Parent =
+    RemoveButton
+
+
+--------------------------------------------------
+-- HISTORY SCROLL
+--------------------------------------------------
+
+local HistoryScroll =
+    Instance.new(
+        "ScrollingFrame"
+    )
+
+HistoryScroll.Size =
+    UDim2.new(
+        0,
+        330,
+        0,
+        250
+    )
+
+HistoryScroll.Position =
+    UDim2.new(
+        0,
+        15,
+        0,
+        280
+    )
+
+HistoryScroll.BackgroundColor3 =
+    Color3.fromRGB(
+        28,
+        28,
+        35
+    )
+
+HistoryScroll.BorderSizePixel =
+    0
+
+HistoryScroll.ScrollBarThickness =
+    5
+
+HistoryScroll.CanvasSize =
+    UDim2.new(
+        0,
+        0,
+        0,
+        0
+    )
+
+HistoryScroll.Parent =
+    Main
+
+
+local HistoryLayout =
+    Instance.new(
+        "UIListLayout"
+    )
+
+HistoryLayout.Padding =
+    UDim.new(
+        0,
+        3
+    )
+
+HistoryLayout.Parent =
+    HistoryScroll
+
+
+--------------------------------------------------
+-- LOG TITLE
+--------------------------------------------------
+
+local LogTitle =
+    Instance.new(
+        "TextLabel"
+    )
+
+LogTitle.Size =
+    UDim2.new(
+        0,
+        350,
+        0,
+        30
+    )
+
+LogTitle.Position =
+    UDim2.new(
+        0,
+        355,
+        0,
+        250
+    )
+
+LogTitle.BackgroundTransparency =
+    1
+
+LogTitle.Text =
+    "📝 REALTIME LOG"
+
+LogTitle.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+LogTitle.TextSize =
+    15
+
+LogTitle.Font =
+    Enum.Font.GothamBold
+
+LogTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+LogTitle.Parent =
+    Main
+
+
+--------------------------------------------------
+-- LOG SCROLL
+--------------------------------------------------
+
+local LogScroll =
+    Instance.new(
+        "ScrollingFrame"
+    )
+
+LogScroll.Size =
+    UDim2.new(
+        0,
+        350,
+        0,
+        250
+    )
+
+LogScroll.Position =
+    UDim2.new(
+        0,
+        355,
+        0,
+        280
+    )
+
+LogScroll.BackgroundColor3 =
+    Color3.fromRGB(
+        28,
+        28,
+        35
+    )
+
+LogScroll.BorderSizePixel =
+    0
+
+LogScroll.ScrollBarThickness =
+    5
+
+LogScroll.CanvasSize =
+    UDim2.new(
+        0,
+        0,
+        0,
+        0
+    )
+
+LogScroll.Parent =
+    Main
+
+
+local LogLayout =
+    Instance.new(
+        "UIListLayout"
+    )
+
+LogLayout.Padding =
+    UDim.new(
+        0,
+        3
+    )
+
+LogLayout.Parent =
+    LogScroll
+
+
+--------------------------------------------------
+-- ADD USERNAME POPUP
+--------------------------------------------------
+
+local InputFrame =
+    Instance.new(
+        "Frame"
+    )
+
+InputFrame.Size =
+    UDim2.new(
+        0,
+        300,
+        0,
+        150
+    )
+
+InputFrame.Position =
+    UDim2.new(
+        0.5,
+        -150,
+        0.5,
+        -75
+    )
+
+InputFrame.BackgroundColor3 =
+    Color3.fromRGB(
+        35,
+        35,
+        42
+    )
+
+InputFrame.Visible =
+    false
+
+InputFrame.ZIndex =
+    20
+
+InputFrame.Parent =
+    ScreenGui
+
+
+local InputCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+InputCorner.CornerRadius =
+    UDim.new(
+        0,
+        10
+    )
+
+InputCorner.Parent =
+    InputFrame
+
+
+--------------------------------------------------
+-- INPUT TITLE
+--------------------------------------------------
+
+local InputTitle =
+    Instance.new(
+        "TextLabel"
+    )
+
+InputTitle.Size =
+    UDim2.new(
+        1,
+        -20,
+        0,
+        30
+    )
+
+InputTitle.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        10
+    )
+
+InputTitle.BackgroundTransparency =
+    1
+
+InputTitle.Text =
+    "ADD USERNAME"
+
+InputTitle.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+InputTitle.TextSize =
+    16
+
+InputTitle.Font =
+    Enum.Font.GothamBold
+
+InputTitle.ZIndex =
+    21
+
+InputTitle.Parent =
+    InputFrame
+
+
+--------------------------------------------------
+-- TEXT BOX
+--------------------------------------------------
+
+local UsernameBox =
+    Instance.new(
+        "TextBox"
+    )
+
+UsernameBox.Size =
+    UDim2.new(
+        1,
+        -30,
+        0,
+        35
+    )
+
+UsernameBox.Position =
+    UDim2.new(
+        0,
+        15,
+        0,
+        50
+    )
+
+UsernameBox.BackgroundColor3 =
+    Color3.fromRGB(
+        25,
+        25,
+        30
+    )
+
+UsernameBox.PlaceholderText =
+    "Masukkan Username"
+
+UsernameBox.Text =
+    ""
+
+UsernameBox.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+UsernameBox.TextSize =
+    13
+
+UsernameBox.Font =
+    Enum.Font.Gotham
+
+UsernameBox.ZIndex =
+    21
+
+UsernameBox.Parent =
+    InputFrame
+
+
+--------------------------------------------------
+-- CONFIRM ADD
+--------------------------------------------------
+
+local ConfirmAdd =
+    Instance.new(
+        "TextButton"
+    )
+
+ConfirmAdd.Size =
+    UDim2.new(
+        0,
+        120,
+        0,
+        30
+    )
+
+ConfirmAdd.Position =
+    UDim2.new(
+        0,
+        15,
+        1,
+        -40
+    )
+
+ConfirmAdd.BackgroundColor3 =
+    Color3.fromRGB(
+        40,
+        170,
+        90
+    )
+
+ConfirmAdd.Text =
+    "ADD"
+
+ConfirmAdd.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+ConfirmAdd.TextSize =
+    13
+
+ConfirmAdd.Font =
+    Enum.Font.GothamBold
+
+ConfirmAdd.ZIndex =
+    21
+
+ConfirmAdd.Parent =
+    InputFrame
+
+
+--------------------------------------------------
+-- CANCEL ADD
+--------------------------------------------------
+
+local CancelAdd =
+    Instance.new(
+        "TextButton"
+    )
+
+CancelAdd.Size =
+    UDim2.new(
+        0,
+        120,
+        0,
+        30
+    )
+
+CancelAdd.Position =
+    UDim2.new(
+        1,
+        -135,
+        1,
+        -40
+    )
+
+CancelAdd.BackgroundColor3 =
+    Color3.fromRGB(
+        100,
+        100,
+        110
+    )
+
+CancelAdd.Text =
+    "CANCEL"
+
+CancelAdd.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+CancelAdd.TextSize =
+    13
+
+CancelAdd.Font =
+    Enum.Font.GothamBold
+
+CancelAdd.ZIndex =
+    21
+
+CancelAdd.Parent =
+    InputFrame
+
+
+--------------------------------------------------
+-- REMOVE POPUP
+--------------------------------------------------
+
+local RemoveFrame =
+    Instance.new(
+        "Frame"
+    )
+
+RemoveFrame.Size =
+    UDim2.new(
+        0,
+        350,
+        0,
+        250
+    )
+
+RemoveFrame.Position =
+    UDim2.new(
+        0.5,
+        -175,
+        0.5,
+        -125
+    )
+
+RemoveFrame.BackgroundColor3 =
+    Color3.fromRGB(
+        35,
+        35,
+        42
+    )
+
+RemoveFrame.Visible =
+    false
+
+RemoveFrame.ZIndex =
+    20
+
+RemoveFrame.Parent =
+    ScreenGui
+
+
+local RemoveCorner =
+    Instance.new(
+        "UICorner"
+    )
+
+RemoveCorner.CornerRadius =
+    UDim.new(
+        0,
+        10
+    )
+
+RemoveCorner.Parent =
+    RemoveFrame
+
+
+--------------------------------------------------
+-- REMOVE TITLE
+--------------------------------------------------
+
+local RemoveTitle =
+    Instance.new(
+        "TextLabel"
+    )
+
+RemoveTitle.Size =
+    UDim2.new(
+        1,
+        -20,
+        0,
+        30
+    )
+
+RemoveTitle.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        8
+    )
+
+RemoveTitle.BackgroundTransparency =
+    1
+
+RemoveTitle.Text =
+    "🗑 REMOVE USERNAME"
+
+RemoveTitle.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+RemoveTitle.TextSize =
+    16
+
+RemoveTitle.Font =
+    Enum.Font.GothamBold
+
+RemoveTitle.ZIndex =
+    21
+
+RemoveTitle.Parent =
+    RemoveFrame
+
+
+--------------------------------------------------
+-- REMOVE LIST
+--------------------------------------------------
+
+local RemoveScroll =
+    Instance.new(
+        "ScrollingFrame"
+    )
+
+RemoveScroll.Size =
+    UDim2.new(
+        1,
+        -20,
+        0,
+        150
+    )
+
+RemoveScroll.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        45
+    )
+
+RemoveScroll.BackgroundColor3 =
+    Color3.fromRGB(
+        25,
+        25,
+        30
+    )
+
+RemoveScroll.BorderSizePixel =
+    0
+
+RemoveScroll.ScrollBarThickness =
+    5
+
+RemoveScroll.ZIndex =
+    21
+
+RemoveScroll.Parent =
+    RemoveFrame
+
+
+local RemoveLayout =
+    Instance.new(
+        "UIListLayout"
+    )
+
+RemoveLayout.Padding =
+    UDim.new(
+        0,
+        3
+    )
+
+RemoveLayout.Parent =
+    RemoveScroll
+
+
+--------------------------------------------------
+-- CLOSE REMOVE
+--------------------------------------------------
+
+local CloseRemove =
+    Instance.new(
+        "TextButton"
+    )
+
+CloseRemove.Size =
+    UDim2.new(
+        0,
+        120,
+        0,
+        30
+    )
+
+CloseRemove.Position =
+    UDim2.new(
+        0.5,
+        -60,
+        1,
+        -40
+    )
+
+CloseRemove.BackgroundColor3 =
+    Color3.fromRGB(
+        100,
+        100,
+        110
+    )
+
+CloseRemove.Text =
+    "CLOSE"
+
+CloseRemove.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+CloseRemove.TextSize =
+    13
+
+CloseRemove.Font =
+    Enum.Font.GothamBold
+
+CloseRemove.ZIndex =
+    21
+
+CloseRemove.Parent =
+    RemoveFrame
+
+
+--------------------------------------------------
+-- FILE API
 --------------------------------------------------
 
 local function IsFileAPIAvailable()
@@ -357,18 +1703,34 @@ local function IsFileAPIAvailable()
 
 end
 
+
 --------------------------------------------------
 -- CREATE DEFAULT HISTORY
 --------------------------------------------------
 
 local function CreateDefaultHistory()
 
-    local History = {}
+    local History =
+        {}
 
-    for _, Username in ipairs(TARGET_USERNAMES) do
+    for _, Username in ipairs(
+        DEFAULT_USERNAMES
+    ) do
 
-        History[Username] =
-            "Belum kirim"
+        History[
+            Username
+        ] = {
+
+            Status =
+                "Belum kirim",
+
+            Value =
+                0,
+
+            FruitCount =
+                0
+
+        }
 
     end
 
@@ -376,31 +1738,167 @@ local function CreateDefaultHistory()
 
 end
 
+
+--------------------------------------------------
+-- NORMALIZE HISTORY
+--------------------------------------------------
+
+local function NormalizeHistory(
+    History
+)
+
+    if type(History)
+        ~= "table"
+    then
+
+        return CreateDefaultHistory()
+
+    end
+
+
+    --------------------------------------------------
+    -- CONVERT OLD FORMAT
+    --------------------------------------------------
+
+    for Username, Data in pairs(
+        History
+    ) do
+
+        if type(Data)
+            == "string"
+        then
+
+            History[
+                Username
+            ] = {
+
+                Status =
+                    Data,
+
+                Value =
+                    0,
+
+                FruitCount =
+                    0
+
+            }
+
+        elseif type(Data)
+            == "table"
+        then
+
+            if Data.Status
+                == nil
+            then
+
+                Data.Status =
+                    "Belum kirim"
+
+            end
+
+            if Data.Value
+                == nil
+            then
+
+                Data.Value =
+                    0
+
+            end
+
+            if Data.FruitCount
+                == nil
+            then
+
+                Data.FruitCount =
+                    0
+
+            end
+
+        end
+
+    end
+
+
+    --------------------------------------------------
+    -- ADD DEFAULT USERNAME
+    --------------------------------------------------
+
+    for _, Username in ipairs(
+        DEFAULT_USERNAMES
+    ) do
+
+        if History[
+            Username
+        ] == nil
+        then
+
+            History[
+                Username
+            ] = {
+
+                Status =
+                    "Belum kirim",
+
+                Value =
+                    0,
+
+                FruitCount =
+                    0
+
+            }
+
+        end
+
+    end
+
+
+    return History
+
+end
+
+
 --------------------------------------------------
 -- SAVE HISTORY
 --------------------------------------------------
 
-local function SaveHistory(History)
+local function SaveHistory(
+    History
+)
 
-    local Success, Error =
-        pcall(function()
+    if not IsFileAPIAvailable() then
 
-            local JsonData =
-                HttpService:JSONEncode(
-                    History
+        warn(
+            "[AUTO SEND] File API tidak tersedia"
+        )
+
+        return false
+
+    end
+
+
+    local Success,
+    Error =
+        pcall(
+            function()
+
+                local JsonData =
+                    HttpService:JSONEncode(
+                        History
+                    )
+
+                writefile(
+                    HISTORY_FILE,
+                    JsonData
                 )
 
-            writefile(
-                HISTORY_FILE,
-                JsonData
-            )
+            end
+        )
 
-        end)
 
     if not Success then
 
         warn(
-            "[AUTO SEND] Gagal menyimpan JSON:",
+            "[AUTO SEND] Save error:",
             Error
         )
 
@@ -408,9 +1906,14 @@ local function SaveHistory(History)
 
     end
 
+
+    CurrentHistory =
+        History
+
     return true
 
 end
+
 
 --------------------------------------------------
 -- LOAD HISTORY
@@ -420,23 +1923,18 @@ local function LoadHistory()
 
     if not IsFileAPIAvailable() then
 
-        warn(
-            "[AUTO SEND] Executor tidak mendukung File API"
-        )
-
         return nil
 
     end
 
+
     --------------------------------------------------
-    -- FILE BELUM ADA
+    -- FILE NOT EXIST
     --------------------------------------------------
 
-    if not isfile(HISTORY_FILE) then
-
-        print(
-            "[AUTO SEND] TradeHistory.json belum ada"
-        )
+    if not isfile(
+        HISTORY_FILE
+    ) then
 
         local NewHistory =
             CreateDefaultHistory()
@@ -449,35 +1947,33 @@ local function LoadHistory()
 
     end
 
+
     --------------------------------------------------
-    -- LOAD JSON
+    -- READ
     --------------------------------------------------
 
-    local Success, History =
-        pcall(function()
+    local Success,
+    History =
+        pcall(
+            function()
 
-            local JsonData =
-                readfile(
-                    HISTORY_FILE
+                local JsonData =
+                    readfile(
+                        HISTORY_FILE
+                    )
+
+                return HttpService:JSONDecode(
+                    JsonData
                 )
 
-            return HttpService:JSONDecode(
-                JsonData
-            )
+            end
+        )
 
-        end)
-
-    --------------------------------------------------
-    -- JSON INVALID
-    --------------------------------------------------
 
     if not Success
-        or type(History) ~= "table"
+        or type(History)
+            ~= "table"
     then
-
-        warn(
-            "[AUTO SEND] JSON invalid"
-        )
 
         local NewHistory =
             CreateDefaultHistory()
@@ -490,91 +1986,486 @@ local function LoadHistory()
 
     end
 
-    --------------------------------------------------
-    -- TAMBAHKAN USERNAME YANG BELUM ADA
-    --------------------------------------------------
 
-    for _, Username in ipairs(TARGET_USERNAMES) do
+    History =
+        NormalizeHistory(
+            History
+        )
 
-        if History[Username] == nil then
-
-            History[Username] =
-                "Belum kirim"
-
-        end
-
-    end
 
     SaveHistory(
         History
     )
+
 
     return History
 
 end
 
+
 --------------------------------------------------
--- CHECK SEMUA SUDAH KIRIM
+-- FORMAT VALUE
 --------------------------------------------------
 
-local function IsAllSent(History)
+local function FormatValue(
+    Value
+)
 
-    for _, Username in ipairs(TARGET_USERNAMES) do
+    Value =
+        tonumber(
+            Value
+        ) or 0
 
-        if History[Username]
-            ~= "Sudah kirim"
+    if Value <= 0 then
+
+        return "0"
+
+    end
+
+
+    local Success,
+    Result =
+        pcall(
+            function()
+
+                return NumberUtils.Abbreviate(
+                    Value
+                )
+
+            end
+        )
+
+
+    if Success
+        and Result
+    then
+
+        return tostring(
+            Result
+        )
+
+    end
+
+
+    return tostring(
+        Value
+    )
+
+end
+
+
+--------------------------------------------------
+-- UPDATE HISTORY GUI
+--------------------------------------------------
+
+local function UpdateHistoryGUI(
+    History
+)
+
+    CurrentHistory =
+        History
+
+
+    --------------------------------------------------
+    -- CLEAR
+    --------------------------------------------------
+
+    for _, Child in ipairs(
+        HistoryScroll:GetChildren()
+    ) do
+
+        if Child:IsA(
+            "TextLabel"
+        )
         then
 
-            return false
+            Child:Destroy()
 
         end
 
     end
 
-    return true
 
-end
+    --------------------------------------------------
+    -- CREATE ROW
+    --------------------------------------------------
 
---------------------------------------------------
--- RESET HISTORY
---------------------------------------------------
+    for Username, Data in pairs(
+        History
+    ) do
 
-local function ResetHistory(History)
+        if type(Data)
+            == "table"
+        then
 
-    print(
-        "[AUTO SEND] Semua username sudah dikirim"
-    )
+            local StatusValue =
+                Data.Status
+                or "Belum kirim"
 
-    print(
-        "[AUTO SEND] Reset TradeHistory.json"
-    )
+            local Value =
+                Data.Value
+                or 0
 
-    for _, Username in ipairs(TARGET_USERNAMES) do
+            local FruitCount =
+                Data.FruitCount
+                or 0
 
-        History[Username] =
-            "Belum kirim"
+
+            local Label =
+                Instance.new(
+                    "TextLabel"
+                )
+
+            Label.Size =
+                UDim2.new(
+                    1,
+                    -10,
+                    0,
+                    42
+                )
+
+            Label.BackgroundTransparency =
+                1
+
+
+            Label.Text =
+                Username
+                .. "\n"
+                .. StatusValue
+                .. " | Value: "
+                .. FormatValue(
+                    Value
+                )
+                .. " | Fruit: "
+                .. FruitCount
+
+
+            if StatusValue
+                == "Sudah kirim"
+            then
+
+                Label.TextColor3 =
+                    Color3.fromRGB(
+                        80,
+                        220,
+                        120
+                    )
+
+            else
+
+                Label.TextColor3 =
+                    Color3.fromRGB(
+                        240,
+                        200,
+                        80
+                    )
+
+            end
+
+
+            Label.TextSize =
+                11
+
+            Label.Font =
+                Enum.Font.Gotham
+
+            Label.TextXAlignment =
+                Enum.TextXAlignment.Left
+
+            Label.TextYAlignment =
+                Enum.TextYAlignment.Center
+
+            Label.Parent =
+                HistoryScroll
+
+        end
 
     end
 
-    SaveHistory(
-        History
+
+    task.defer(
+        function()
+
+            HistoryScroll.CanvasSize =
+                UDim2.new(
+                    0,
+                    0,
+                    0,
+                    HistoryLayout.AbsoluteContentSize.Y
+                )
+
+        end
     )
 
 end
 
+
 --------------------------------------------------
--- GET TARGET BERIKUTNYA
+-- UPDATE INFO
 --------------------------------------------------
 
-local function GetNextTarget(History)
+local function UpdateInfo()
 
-    for _, Username in ipairs(TARGET_USERNAMES) do
+    local FruitCount =
+        0
 
-        if History[Username]
-            == "Belum kirim"
+
+    for _, Item in ipairs(
+        Backpack:GetChildren()
+    ) do
+
+        if Item:IsA("Tool")
+            or Item:IsA(
+                "Configuration"
+            )
         then
 
-            return Username
+            if Item:GetAttribute(
+                "FruitName"
+            )
+            then
+
+                FruitCount += 1
+
+            end
+
+        end
+
+    end
+
+
+    InfoLabel.Text =
+
+        "Cycle: "
+        .. Cycle
+
+        .. "\nHarvest: "
+        .. LastHarvestCount
+
+        .. "\nFavorited: "
+        .. LastFavoriteCount
+
+        .. "\nFruit Backpack: "
+        .. FruitCount
+
+        .. "\nSend Count: "
+        .. LastSendCount
+
+        .. "\nSend Value: "
+        .. FormatValue(
+            LastSendValue
+        )
+
+end
+
+
+--------------------------------------------------
+-- SET STATUS
+--------------------------------------------------
+
+local function SetStatus(
+    Step
+)
+
+    CurrentStep =
+        Step
+
+    StepLabel.Text =
+        "Current Step: "
+        .. Step
+
+
+    if Running then
+
+        Status.Text =
+            "🟢 RUNNING"
+
+        Status.TextColor3 =
+            Color3.fromRGB(
+                80,
+                220,
+                120
+            )
+
+    else
+
+        Status.Text =
+            "🔴 STOPPED"
+
+        Status.TextColor3 =
+            Color3.fromRGB(
+                255,
+                80,
+                80
+            )
+
+    end
+
+
+    UpdateInfo()
+
+end
+
+
+--------------------------------------------------
+-- LOG
+--------------------------------------------------
+
+local function AddLog(
+    Message
+)
+
+    print(
+        "[GUI LOG]",
+        Message
+    )
+
+
+    local Label =
+        Instance.new(
+            "TextLabel"
+        )
+
+    Label.Size =
+        UDim2.new(
+            1,
+            -10,
+            0,
+            22
+        )
+
+    Label.BackgroundTransparency =
+        1
+
+    Label.Text =
+        os.date(
+            "%H:%M:%S"
+        )
+        .. " | "
+        .. tostring(
+            Message
+        )
+
+    Label.TextColor3 =
+        Color3.fromRGB(
+            210,
+            210,
+            210
+        )
+
+    Label.TextSize =
+        11
+
+    Label.Font =
+        Enum.Font.Gotham
+
+    Label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    Label.TextWrapped =
+        true
+
+    Label.Parent =
+        LogScroll
+
+
+    task.defer(
+        function()
+
+            LogScroll.CanvasSize =
+                UDim2.new(
+                    0,
+                    0,
+                    0,
+                    LogLayout.AbsoluteContentSize.Y
+                )
+
+            LogScroll.CanvasPosition =
+                Vector2.new(
+                    0,
+                    math.max(
+                        0,
+                        LogLayout.AbsoluteContentSize.Y
+                        - LogScroll.AbsoluteWindowSize.Y
+                    )
+                )
+
+        end
+    )
+
+
+    --------------------------------------------------
+    -- MAX LOG
+    --------------------------------------------------
+
+    local Labels =
+        {}
+
+    for _, Child in ipairs(
+        LogScroll:GetChildren()
+    ) do
+
+        if Child:IsA(
+            "TextLabel"
+        )
+        then
+
+            table.insert(
+                Labels,
+                Child
+            )
+
+        end
+
+    end
+
+
+    if #Labels >
+        100
+    then
+
+        Labels[
+            1
+        ]:Destroy()
+
+    end
+
+end
+
+
+--------------------------------------------------
+-- CHECK STOP
+--------------------------------------------------
+
+local function ShouldStop()
+
+    return not Running
+
+end
+
+
+--------------------------------------------------
+-- GET MY PLOT
+--------------------------------------------------
+
+local function GetMyPlot()
+
+    for i = 1, 8 do
+
+        local Plot =
+            Gardens:FindFirstChild(
+                "Plot"
+                .. i
+            )
+
+        if Plot
+            and Plot:GetAttribute(
+                "Owner"
+            )
+            == LocalPlayer.Name
+        then
+
+            return Plot
 
         end
 
@@ -584,28 +2475,502 @@ local function GetNextTarget(History)
 
 end
 
+
+--------------------------------------------------
+-- HARVEST
+--------------------------------------------------
+
+local function HarvestFruits()
+
+    if ShouldStop() then
+
+        return 0
+
+    end
+
+
+    SetStatus(
+        "🌱 HARVEST"
+    )
+
+
+    AddLog(
+        "Memulai harvest..."
+    )
+
+
+    local MyPlot =
+        GetMyPlot()
+
+
+    if not MyPlot then
+
+        AddLog(
+            "❌ Plot tidak ditemukan"
+        )
+
+        return 0
+
+    end
+
+
+    local Plants =
+        MyPlot:FindFirstChild(
+            "Plants"
+        )
+
+
+    if not Plants then
+
+        AddLog(
+            "❌ Folder Plants tidak ditemukan"
+        )
+
+        return 0
+
+    end
+
+
+    local harvested =
+        0
+
+
+    for _, Plant in ipairs(
+        Plants:GetChildren()
+    ) do
+
+        if ShouldStop() then
+
+            break
+
+        end
+
+
+        --------------------------------------------------
+        -- PLANT HARVEST
+        --------------------------------------------------
+
+        local HarvestPart =
+            Plant:FindFirstChild(
+                "HarvestPart"
+            )
+
+
+        if HarvestPart then
+
+            local HarvestPrompt =
+                HarvestPart:FindFirstChild(
+                    "HarvestPrompt"
+                )
+
+
+            if HarvestPrompt
+                and HarvestPrompt:IsA(
+                    "ProximityPrompt"
+                )
+            then
+
+                pcall(
+                    function()
+
+                        fireproximityprompt(
+                            HarvestPrompt
+                        )
+
+                    end
+                )
+
+
+                harvested += 1
+
+
+                task.wait(
+                    0.001
+                )
+
+            end
+
+        end
+
+
+        --------------------------------------------------
+        -- FRUIT HARVEST
+        --------------------------------------------------
+
+        local Fruits =
+            Plant:FindFirstChild(
+                "Fruits"
+            )
+
+
+        if Fruits then
+
+            for _, Fruit in ipairs(
+                Fruits:GetChildren()
+            ) do
+
+                if ShouldStop() then
+
+                    break
+
+                end
+
+
+                local SizeMulti =
+                    Fruit:GetAttribute(
+                        "SizeMulti"
+                    )
+                    or 1
+
+
+                local Mutation =
+                    Fruit:GetAttribute(
+                        "Mutation"
+                    )
+
+
+                if SizeMulti >
+                    SIZE_THRESHOLD
+                    and not Mutation
+                then
+
+                    continue
+
+                end
+
+
+                local CorePartName =
+                    Fruit:GetAttribute(
+                        "CorePartName"
+                    )
+
+
+                if BLACKLIST[
+                    CorePartName
+                ]
+                then
+
+                    continue
+
+                end
+
+
+                local FruitHarvestPart =
+                    Fruit:FindFirstChild(
+                        "HarvestPart"
+                    )
+
+
+                if FruitHarvestPart then
+
+                    local FruitPrompt =
+                        FruitHarvestPart:FindFirstChild(
+                            "HarvestPrompt"
+                        )
+
+
+                    if FruitPrompt
+                        and FruitPrompt:IsA(
+                            "ProximityPrompt"
+                        )
+                    then
+
+                        pcall(
+                            function()
+
+                                fireproximityprompt(
+                                    FruitPrompt
+                                )
+
+                            end
+                        )
+
+
+                        harvested += 1
+
+
+                        task.wait(
+                            0.001
+                        )
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+
+    LastHarvestCount =
+        harvested
+
+
+    UpdateInfo()
+
+
+    AddLog(
+        "🌱 Harvest selesai: "
+        .. harvested
+    )
+
+
+    return harvested
+
+end
+
+
+--------------------------------------------------
+-- FAVORITE
+--------------------------------------------------
+
+local function FavoriteBigFruits()
+
+    if ShouldStop() then
+
+        return 0
+
+    end
+
+
+    SetStatus(
+        "⭐ FAVORITE"
+    )
+
+
+    AddLog(
+        "Scanning fruit SizeMultiplier > "
+        .. SIZE_MULTIPLIER_LIMIT
+    )
+
+
+    table.clear(
+        FavoritedFruits
+    )
+
+
+    local Count =
+        0
+
+
+    for _, Fruit in ipairs(
+        Backpack:GetChildren()
+    ) do
+
+        if ShouldStop() then
+
+            break
+
+        end
+
+
+        local FruitId =
+            Fruit:GetAttribute(
+                "Id"
+            )
+
+
+        local SizeMultiplier =
+            Fruit:GetAttribute(
+                "SizeMultiplier"
+            )
+
+
+        if FruitId
+            and SizeMultiplier
+            and SizeMultiplier >
+                SIZE_MULTIPLIER_LIMIT
+        then
+
+            Networking.Backpack.SetFruitFavorite:Fire(
+
+                FruitId,
+
+                true
+
+            )
+
+
+            FavoritedFruits[
+                FruitId
+            ] =
+                true
+
+
+            Count += 1
+
+
+            task.wait(
+                FAVORITE_DELAY
+            )
+
+        end
+
+    end
+
+
+    LastFavoriteCount =
+        Count
+
+
+    UpdateInfo()
+
+
+    AddLog(
+        "⭐ Favorite selesai: "
+        .. Count
+    )
+
+
+    return Count
+
+end
+
+
+--------------------------------------------------
+-- SELL ALL
+--------------------------------------------------
+
+local function SellAll()
+
+    if ShouldStop() then
+
+        return
+
+    end
+
+
+    SetStatus(
+        "💰 SELL ALL"
+    )
+
+
+    AddLog(
+        "PreviewSellAll..."
+    )
+
+
+    Networking.NPCS.PreviewSellAll:Fire()
+
+
+    task.wait(
+        BEFORE_SELL_DELAY
+    )
+
+
+    if ShouldStop() then
+
+        return
+
+    end
+
+
+    AddLog(
+        "SellAll..."
+    )
+
+
+    Networking.NPCS.SellAll:Fire()
+
+
+    AddLog(
+        "💰 SellAll selesai"
+    )
+
+end
+
+
+--------------------------------------------------
+-- UNFAVORITE
+--------------------------------------------------
+
+local function UnfavoriteBigFruits()
+
+    if ShouldStop() then
+
+        return
+
+    end
+
+
+    SetStatus(
+        "🔓 UNFAVORITE"
+    )
+
+
+    local Count =
+        0
+
+
+    for FruitId in pairs(
+        FavoritedFruits
+    ) do
+
+        if ShouldStop() then
+
+            break
+
+        end
+
+
+        Networking.Backpack.SetFruitFavorite:Fire(
+
+            FruitId,
+
+            false
+
+        )
+
+
+        Count += 1
+
+
+        task.wait(
+            UNFAVORITE_DELAY
+        )
+
+    end
+
+
+    table.clear(
+        FavoritedFruits
+    )
+
+
+    AddLog(
+        "🔓 Unfavorite selesai: "
+        .. Count
+    )
+
+end
+
+
 --------------------------------------------------
 -- COUNT FRUIT
 --------------------------------------------------
 
 local function GetFruitCount()
 
-    local Count = 0
+    local Count =
+        0
+
 
     for _, Item in ipairs(
         Backpack:GetChildren()
     ) do
 
         if Item:IsA("Tool")
-            or Item:IsA("Configuration")
+            or Item:IsA(
+                "Configuration"
+            )
         then
 
-            local FruitName =
-                Item:GetAttribute(
-                    "FruitName"
-                )
-
-            if FruitName then
+            if Item:GetAttribute(
+                "FruitName"
+            )
+            then
 
                 Count += 1
 
@@ -615,9 +2980,125 @@ local function GetFruitCount()
 
     end
 
+
     return Count
 
 end
+
+
+--------------------------------------------------
+-- ALL SENT
+--------------------------------------------------
+
+local function IsAllSent(
+    History
+)
+
+    for _, Data in pairs(
+        History
+    ) do
+
+        if type(Data)
+            == "table"
+        then
+
+            if Data.Status
+                ~= "Sudah kirim"
+            then
+
+                return false
+
+            end
+
+        end
+
+    end
+
+
+    return true
+
+end
+
+
+--------------------------------------------------
+-- RESET STATUS
+--------------------------------------------------
+
+local function ResetHistoryStatus(
+    History
+)
+
+    AddLog(
+        "🔄 Semua target sudah dikirim"
+    )
+
+
+    AddLog(
+        "Reset status ke Belum kirim"
+    )
+
+
+    for _, Data in pairs(
+        History
+    ) do
+
+        if type(Data)
+            == "table"
+        then
+
+            Data.Status =
+                "Belum kirim"
+
+        end
+
+    end
+
+
+    SaveHistory(
+        History
+    )
+
+
+    UpdateHistoryGUI(
+        History
+    )
+
+end
+
+
+--------------------------------------------------
+-- GET NEXT TARGET
+--------------------------------------------------
+
+local function GetNextTarget(
+    History
+)
+
+    for Username, Data in pairs(
+        History
+    ) do
+
+        if type(Data)
+            == "table"
+        then
+
+            if Data.Status
+                == "Belum kirim"
+            then
+
+                return Username
+
+            end
+
+        end
+
+    end
+
+
+    return nil
+
+end
+
 
 --------------------------------------------------
 -- BUILD BATCH
@@ -625,22 +3106,24 @@ end
 
 local function BuildBatch()
 
-    local Fruits = {}
+    local Fruits =
+        {}
 
-    local Batch = {}
+    local Batch =
+        {}
 
-    local TotalValue = 0
+    local TotalValue =
+        0
 
-    --------------------------------------------------
-    -- SCAN BACKPACK
-    --------------------------------------------------
 
     for _, Item in ipairs(
         Backpack:GetChildren()
     ) do
 
         if Item:IsA("Tool")
-            or Item:IsA("Configuration")
+            or Item:IsA(
+                "Configuration"
+            )
         then
 
             local FruitName =
@@ -648,44 +3131,41 @@ local function BuildBatch()
                     "FruitName"
                 )
 
+
             if FruitName then
 
-                --------------------------------------------------
-                -- CALCULATE VALUE
-                --------------------------------------------------
+                local Success,
+                Value =
+                    pcall(
+                        function()
 
-                local Success, Value =
-                    pcall(function()
+                            return FruitValueCalc(
 
-                        return FruitValueCalc(
+                                FruitName,
 
-                            FruitName,
+                                Item:GetAttribute(
+                                    "SizeMultiplier"
+                                ),
 
-                            Item:GetAttribute(
-                                "SizeMultiplier"
-                            ),
+                                Item:GetAttribute(
+                                    "Mutation"
+                                ),
 
-                            Item:GetAttribute(
-                                "Mutation"
-                            ),
+                                LocalPlayer,
 
-                            LocalPlayer,
+                                Item:GetAttribute(
+                                    "DecayAlpha"
+                                )
 
-                            Item:GetAttribute(
-                                "DecayAlpha"
                             )
 
-                        )
+                        end
+                    )
 
-                    end)
 
                 if Success
                     and Value
                 then
-
-                    --------------------------------------------------
-                    -- GET FRUIT ID
-                    --------------------------------------------------
 
                     local FruitId =
 
@@ -711,14 +3191,22 @@ local function BuildBatch()
                             "Id"
                         )
 
+
                     if FruitId then
 
                         table.insert(
                             Fruits,
                             {
-                                Item = Item,
-                                Value = Value,
-                                FruitId = FruitId
+
+                                Item =
+                                    Item,
+
+                                Value =
+                                    Value,
+
+                                FruitId =
+                                    FruitId
+
                             }
                         )
 
@@ -732,100 +3220,148 @@ local function BuildBatch()
 
     end
 
+
     --------------------------------------------------
-    -- SORT VALUE TERBESAR
+    -- SORT TERBESAR
     --------------------------------------------------
 
     table.sort(
         Fruits,
 
-        function(a, b)
+        function(
+            A,
+            B
+        )
 
-            return a.Value > b.Value
+            return A.Value >
+                B.Value
 
         end
-
     )
 
+
     --------------------------------------------------
-    -- BUILD BATCH
+    -- BUILD
     --------------------------------------------------
 
-    for _, Data in ipairs(Fruits) do
+    for _, Data in ipairs(
+        Fruits
+    ) do
 
-        if #Batch >= MAX_FRUIT_SEND then
+        if #Batch >=
+            MAX_FRUIT_SEND
+        then
+
             break
+
         end
 
-        if TotalValue >= TARGET_VALUE then
+
+        if TotalValue >=
+            TARGET_VALUE
+        then
+
             break
+
         end
+
 
         table.insert(
             Batch,
+
             {
+
                 Category =
                     "HarvestedFruits",
 
                 ItemKey =
                     Data.FruitId,
 
-                Count = 1
+                Count =
+                    1
+
             }
         )
+
 
         TotalValue +=
             Data.Value
 
     end
 
-    print(
-        "[AUTO SEND] Batch:",
-        #Batch,
-        "| Total Value:",
-        NumberUtils.Abbreviate(
-            TotalValue
-        ) .. "¢"
-    )
 
-    return Batch, TotalValue
+    return Batch,
+        TotalValue
 
 end
 
+
 --------------------------------------------------
--- SEND KE TARGET
+-- SEND TARGET
 --------------------------------------------------
 
 local function SendToTarget(
     TargetUsername
 )
 
+    if ShouldStop() then
+
+        return false
+
+    end
+
+
+    CurrentTarget =
+        TargetUsername
+
+
+    SendLabel.Text =
+
+        "AUTO SEND\n\n"
+
+        .. "Target: "
+        .. TargetUsername
+
+        .. "\nStatus: Getting UserId..."
+
+        .. "\nValue: 0"
+
+
+    AddLog(
+        "Target: "
+        .. TargetUsername
+    )
+
+
     --------------------------------------------------
-    -- GET USER ID
+    -- USER ID
     --------------------------------------------------
 
     local SuccessUserId,
     TargetUserId =
-        pcall(function()
+        pcall(
+            function()
 
-            return Players:GetUserIdFromNameAsync(
-                TargetUsername
-            )
+                return Players:GetUserIdFromNameAsync(
+                    TargetUsername
+                )
 
-        end)
+            end
+        )
+
 
     if not SuccessUserId
         or not TargetUserId
     then
 
-        warn(
-            "[AUTO SEND] Gagal mendapatkan UserId:",
-            TargetUsername
+        AddLog(
+            "❌ UserId gagal"
         )
 
         return false
 
     end
+
 
     --------------------------------------------------
     -- BUILD BATCH
@@ -835,113 +3371,185 @@ local function SendToTarget(
     TotalValue =
         BuildBatch()
 
+
+    LastSendCount =
+        #Batch
+
+
+    LastSendValue =
+        TotalValue
+
+
+    UpdateInfo()
+
+
     if #Batch == 0 then
 
-        warn(
-            "[AUTO SEND] Batch kosong"
+        AddLog(
+            "❌ Batch kosong"
         )
 
         return false
 
     end
 
+
     --------------------------------------------------
     -- SEND
     --------------------------------------------------
 
-    print(
-        "[AUTO SEND] Mengirim",
-        #Batch,
-        "fruit ke",
-        TargetUsername
-    )
+    SendLabel.Text =
 
-    local SuccessSend =
-        pcall(function()
+        "AUTO SEND\n\n"
 
-            Networking.Mailbox.SendBatch:Fire(
+        .. "Target: "
+        .. TargetUsername
 
-                TargetUserId,
+        .. "\nStatus: Sending..."
 
-                Batch,
+        .. "\nFruit: "
+        .. #Batch
 
-                NOTE
-
-            )
-
-        end)
-
-    if SuccessSend then
-
-        print(
-            "[AUTO SEND] Berhasil:",
-            TargetUsername
+        .. "\nValue: "
+        .. FormatValue(
+            TotalValue
         )
 
-        return true
+
+    AddLog(
+
+        "📤 Sending "
+        .. #Batch
+        .. " fruit"
+
+        .. " | Value: "
+        .. FormatValue(
+            TotalValue
+        )
+
+    )
+
+
+    local SuccessSend =
+        pcall(
+            function()
+
+                Networking.Mailbox.SendBatch:Fire(
+
+                    TargetUserId,
+
+                    Batch,
+
+                    NOTE
+
+                )
+
+            end
+        )
+
+
+    if not SuccessSend then
+
+        AddLog(
+            "❌ Send gagal"
+        )
+
+        return false
 
     end
 
-    warn(
-        "[AUTO SEND] Send gagal:",
-        TargetUsername
+
+    --------------------------------------------------
+    -- SUCCESS
+    --------------------------------------------------
+
+    AddLog(
+
+        "✅ Berhasil dikirim ke "
+        .. TargetUsername
+
     )
 
-    return false
+
+    SendLabel.Text =
+
+        "AUTO SEND\n\n"
+
+        .. "Target: "
+        .. TargetUsername
+
+        .. "\nStatus: ✅ Success"
+
+        .. "\nFruit: "
+        .. #Batch
+
+        .. "\nValue: "
+        .. FormatValue(
+            TotalValue
+        )
+
+
+    return true
 
 end
 
+
 --------------------------------------------------
 -- RUN AUTO SEND
--- HANYA 1 TARGET PER PEMANGGILAN
 --------------------------------------------------
 
 local function RunAutoSend()
 
-    print("")
-    print(
-        "======================================"
-    )
-
-    print(
-        "[AUTO SEND] START"
-    )
-
-    print(
-        "======================================"
-    )
-
-    --------------------------------------------------
-    -- LOAD HISTORY
-    --------------------------------------------------
-
-    local History =
-        LoadHistory()
-
-    if not History then
+    if ShouldStop() then
 
         return
 
     end
 
-    --------------------------------------------------
-    -- RESET JIKA SEMUA SUDAH KIRIM
-    --------------------------------------------------
 
-    if IsAllSent(History) then
+    SetStatus(
+        "📦 AUTO SEND"
+    )
 
-        ResetHistory(
-            History
+
+    local History =
+        LoadHistory()
+
+
+    if not History then
+
+        AddLog(
+            "❌ History gagal dimuat"
         )
 
-        --------------------------------------------------
-        -- Setelah reset, target kembali USERNAME PERTAMA
-        --------------------------------------------------
+        return
 
     end
 
+
+    UpdateHistoryGUI(
+        History
+    )
+
+
     --------------------------------------------------
-    -- CARI TARGET
+    -- RESET IF ALL SENT
+    --------------------------------------------------
+
+    if IsAllSent(
+        History
+    )
+    then
+
+        ResetHistoryStatus(
+            History
+        )
+
+    end
+
+
+    --------------------------------------------------
+    -- GET TARGET
     --------------------------------------------------
 
     local TargetUsername =
@@ -949,192 +3557,993 @@ local function RunAutoSend()
             History
         )
 
+
     if not TargetUsername then
 
-        warn(
-            "[AUTO SEND] Tidak ada target"
+        AddLog(
+            "⚠️ Tidak ada target"
         )
 
         return
 
     end
 
-    print(
-        "[AUTO SEND] Target:",
+
+    CurrentTarget =
         TargetUsername
-    )
+
 
     --------------------------------------------------
-    -- CHECK JUMLAH FRUIT
+    -- CHECK FRUIT
     --------------------------------------------------
 
     local FruitCount =
         GetFruitCount()
 
-    print(
-        "[AUTO SEND] Fruit:",
-        FruitCount
+
+    UpdateInfo()
+
+
+    AddLog(
+
+        "Fruit tersedia: "
+        .. FruitCount
+
     )
 
-    --------------------------------------------------
-    -- MINIMUM 20 FRUIT
-    --------------------------------------------------
 
-    if FruitCount < MAX_FRUIT_SEND then
+    if FruitCount <
+        MAX_FRUIT_SEND
+    then
 
-        print(
-            "[AUTO SEND] Fruit belum cukup"
-        )
+        AddLog(
 
-        print(
-            "[AUTO SEND] Butuh:",
-            MAX_FRUIT_SEND
+            "⏳ Fruit belum cukup"
+
+            .. " | Butuh: "
+            .. MAX_FRUIT_SEND
+
         )
 
         return
 
     end
 
+
     --------------------------------------------------
     -- SEND
     --------------------------------------------------
 
-    local SendSuccess =
+    local Success =
         SendToTarget(
             TargetUsername
         )
+
 
     --------------------------------------------------
     -- UPDATE HISTORY
     --------------------------------------------------
 
-    if SendSuccess then
+    if Success then
 
-        History[TargetUsername] =
-            "Sudah kirim"
+        History[
+            TargetUsername
+        ] = {
+
+            Status =
+                "Sudah kirim",
+
+            Value =
+                LastSendValue,
+
+            FruitCount =
+                LastSendCount
+
+        }
+
 
         SaveHistory(
             History
         )
 
-        print(
-            "[AUTO SEND] History updated:",
-            TargetUsername,
-            "-> Sudah kirim"
+
+        UpdateHistoryGUI(
+            History
+        )
+
+
+        AddLog(
+
+            "📜 History updated"
+
+            .. " | "
+            .. TargetUsername
+
+            .. " | Value: "
+            .. FormatValue(
+                LastSendValue
+            )
+
         )
 
     end
 
 end
 
+
 --------------------------------------------------
--- MAIN LOOP
+-- RUN CYCLE
 --------------------------------------------------
 
-while true do
+local function RunCycle()
 
-    print("")
-    print("======================================")
-    print("[MAIN LOOP] START CYCLE")
-    print("======================================")
+    if ShouldStop() then
+
+        return
+
+    end
+
+
+    Cycle += 1
+
+
+    AddLog(
+        "================================"
+    )
+
+
+    AddLog(
+        "🔄 START CYCLE #"
+        .. Cycle
+    )
+
 
     --------------------------------------------------
-    -- 1. HARVEST
+    -- HARVEST
     --------------------------------------------------
-
-    print("[MAIN LOOP] STEP 1 -> HARVEST")
 
     local HarvestedCount =
         HarvestFruits()
 
-    --------------------------------------------------
-    -- 2. TUNGGU BUAH MASUK BACKPACK
-    --------------------------------------------------
+
+    if ShouldStop() then
+
+        return
+
+    end
+
 
     task.wait(
         AFTER_HARVEST_DELAY
     )
 
-    --------------------------------------------------
-    -- 3. FAVORITE SIZE MULTIPLIER > 8
-    --------------------------------------------------
 
-    print(
-        "[MAIN LOOP] STEP 2 -> FAVORITE"
-    )
+    --------------------------------------------------
+    -- FAVORITE
+    --------------------------------------------------
 
     local FavoritedCount =
         FavoriteBigFruits()
 
-    --------------------------------------------------
-    -- 4. TUNGGU FAVORITE
-    --------------------------------------------------
+
+    if ShouldStop() then
+
+        return
+
+    end
+
 
     task.wait(
         BEFORE_SELL_DELAY
     )
 
-    --------------------------------------------------
-    -- 5. SELL ALL
-    --------------------------------------------------
 
-    print(
-        "[MAIN LOOP] STEP 3 -> SELL ALL"
-    )
+    --------------------------------------------------
+    -- SELL
+    --------------------------------------------------
 
     SellAll()
 
-    --------------------------------------------------
-    -- 6. TUNGGU SELL SELESAI
-    --------------------------------------------------
+
+    if ShouldStop() then
+
+        return
+
+    end
+
 
     task.wait(
         AFTER_SELL_DELAY
     )
 
-    --------------------------------------------------
-    -- 7. UNFAVORITE
-    --------------------------------------------------
 
-    print(
-        "[MAIN LOOP] STEP 4 -> UNFAVORITE"
-    )
+    --------------------------------------------------
+    -- UNFAVORITE
+    --------------------------------------------------
 
     UnfavoriteBigFruits()
 
-    --------------------------------------------------
-    -- 8. AUTO SEND
-    --------------------------------------------------
 
-    print(
-        "[MAIN LOOP] STEP 5 -> AUTO SEND"
-    )
+    if ShouldStop() then
+
+        return
+
+    end
+
+
+    --------------------------------------------------
+    -- AUTO SEND
+    --------------------------------------------------
 
     RunAutoSend()
 
+
     --------------------------------------------------
-    -- 9. SELESAI
+    -- COMPLETE
     --------------------------------------------------
 
-    print("")
-    print("======================================")
-    print(
-        "[MAIN LOOP] CYCLE SELESAI"
-    )
-    print(
-        "Harvest:",
-        HarvestedCount,
-        "| Favorited:",
+    LastHarvestCount =
+        HarvestedCount
+
+
+    LastFavoriteCount =
         FavoritedCount
-    )
-    print("======================================")
 
-    --------------------------------------------------
-    -- 10. LOOP DELAY
-    --------------------------------------------------
 
-    task.wait(
-        LOOP_DELAY
+    UpdateInfo()
+
+
+    AddLog(
+
+        "✅ CYCLE #"
+        .. Cycle
+        .. " SELESAI"
+
     )
 
 end
+
+
+--------------------------------------------------
+-- START LOOP
+--------------------------------------------------
+
+local function StartLoop()
+
+    if Running then
+
+        AddLog(
+            "⚠️ Sudah running"
+        )
+
+        return
+
+    end
+
+
+    Running =
+        true
+
+
+    SetStatus(
+        "Starting..."
+    )
+
+
+    AddLog(
+        "▶ AUTO START"
+    )
+
+
+    task.spawn(
+        function()
+
+            while Running do
+
+                local Success,
+                Error =
+                    pcall(
+                        function()
+
+                            RunCycle()
+
+                        end
+                    )
+
+
+                if not Success then
+
+                    AddLog(
+
+                        "❌ ERROR: "
+                        .. tostring(
+                            Error
+                        )
+
+                    )
+
+                end
+
+
+                if not Running then
+
+                    break
+
+                end
+
+
+                SetStatus(
+                    "⏳ WAIT NEXT CYCLE"
+                )
+
+
+                for i = 1,
+                    LOOP_DELAY * 10
+                do
+
+                    if not Running then
+
+                        break
+
+                    end
+
+
+                    task.wait(
+                        0.1
+                    )
+
+                end
+
+            end
+
+
+            SetStatus(
+                "Idle"
+            )
+
+
+            AddLog(
+                "⏹ LOOP STOPPED"
+            )
+
+        end
+    )
+
+end
+
+
+--------------------------------------------------
+-- STOP LOOP
+--------------------------------------------------
+
+local function StopLoop()
+
+    if not Running then
+
+        AddLog(
+            "⚠️ Sudah berhenti"
+        )
+
+        return
+
+    end
+
+
+    Running =
+        false
+
+
+    Status.Text =
+        "🟡 STOPPING"
+
+
+    Status.TextColor3 =
+        Color3.fromRGB(
+            255,
+            200,
+            80
+        )
+
+
+    AddLog(
+        "⏹ Stop requested"
+    )
+
+end
+
+
+--------------------------------------------------
+-- ADD USERNAME
+--------------------------------------------------
+
+local function AddUsername(
+    Username
+)
+
+    Username =
+        tostring(
+            Username or ""
+        )
+
+
+    Username =
+        Username:match(
+            "^%s*(.-)%s*$"
+        )
+
+
+    if Username == "" then
+
+        AddLog(
+            "❌ Username kosong"
+        )
+
+        return
+
+    end
+
+
+    local History =
+        LoadHistory()
+
+
+    if not History then
+
+        return
+
+    end
+
+
+    if History[
+        Username
+    ] then
+
+        AddLog(
+
+            "⚠️ Username sudah ada: "
+            .. Username
+
+        )
+
+        return
+
+    end
+
+
+    History[
+        Username
+    ] = {
+
+        Status =
+            "Belum kirim",
+
+        Value =
+            0,
+
+        FruitCount =
+            0
+
+    }
+
+
+    SaveHistory(
+        History
+    )
+
+
+    UpdateHistoryGUI(
+        History
+    )
+
+
+    AddLog(
+
+        "➕ Username ditambahkan: "
+        .. Username
+
+    )
+
+end
+
+
+--------------------------------------------------
+-- REMOVE USERNAME
+--------------------------------------------------
+
+local function RemoveUsername(
+    Username
+)
+
+    local History =
+        LoadHistory()
+
+
+    if not History then
+
+        return
+
+    end
+
+
+    if not History[
+        Username
+    ] then
+
+        AddLog(
+
+            "⚠️ Username tidak ditemukan: "
+            .. Username
+
+        )
+
+        return
+
+    end
+
+
+    History[
+        Username
+    ] =
+        nil
+
+
+    SaveHistory(
+        History
+    )
+
+
+    UpdateHistoryGUI(
+        History
+    )
+
+
+    AddLog(
+
+        "🗑 Username dihapus: "
+        .. Username
+
+    )
+
+end
+
+
+--------------------------------------------------
+-- REFRESH REMOVE LIST
+--------------------------------------------------
+
+local function RefreshRemoveList()
+
+    for _, Child in ipairs(
+        RemoveScroll:GetChildren()
+    ) do
+
+        if Child:IsA(
+            "TextButton"
+        )
+        then
+
+            Child:Destroy()
+
+        end
+
+    end
+
+
+    local History =
+        LoadHistory()
+
+
+    if not History then
+
+        return
+
+    end
+
+
+    for Username in pairs(
+        History
+    ) do
+
+        local Button =
+            Instance.new(
+                "TextButton"
+            )
+
+
+        Button.Size =
+            UDim2.new(
+                1,
+                -10,
+                0,
+                28
+            )
+
+
+        Button.BackgroundColor3 =
+            Color3.fromRGB(
+                55,
+                55,
+                65
+            )
+
+
+        Button.Text =
+            "🗑  "
+            .. Username
+
+
+        Button.TextColor3 =
+            Color3.fromRGB(
+                255,
+                255,
+                255
+            )
+
+
+        Button.TextSize =
+            12
+
+
+        Button.Font =
+            Enum.Font.Gotham
+
+
+        Button.ZIndex =
+            22
+
+
+        Button.Parent =
+            RemoveScroll
+
+
+        Button.MouseButton1Click:Connect(
+
+            function()
+
+                RemoveUsername(
+                    Username
+                )
+
+
+                RefreshRemoveList()
+
+            end
+
+        )
+
+    end
+
+
+    task.defer(
+        function()
+
+            RemoveScroll.CanvasSize =
+                UDim2.new(
+                    0,
+                    0,
+                    0,
+                    RemoveLayout.AbsoluteContentSize.Y
+                )
+
+        end
+    )
+
+end
+
+
+--------------------------------------------------
+-- BUTTON EVENTS
+--------------------------------------------------
+
+StartButton.MouseButton1Click:Connect(
+
+    function()
+
+        StartLoop()
+
+    end
+
+)
+
+
+StopButton.MouseButton1Click:Connect(
+
+    function()
+
+        StopLoop()
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- ADD BUTTON
+--------------------------------------------------
+
+AddButton.MouseButton1Click:Connect(
+
+    function()
+
+        UsernameBox.Text =
+            ""
+
+        InputFrame.Visible =
+            true
+
+        UsernameBox:CaptureFocus()
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- CONFIRM ADD
+--------------------------------------------------
+
+ConfirmAdd.MouseButton1Click:Connect(
+
+    function()
+
+        AddUsername(
+            UsernameBox.Text
+        )
+
+
+        UsernameBox.Text =
+            ""
+
+
+        InputFrame.Visible =
+            false
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- CANCEL ADD
+--------------------------------------------------
+
+CancelAdd.MouseButton1Click:Connect(
+
+    function()
+
+        InputFrame.Visible =
+            false
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- REMOVE BUTTON
+--------------------------------------------------
+
+RemoveButton.MouseButton1Click:Connect(
+
+    function()
+
+        RefreshRemoveList()
+
+        RemoveFrame.Visible =
+            true
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- CLOSE REMOVE
+--------------------------------------------------
+
+CloseRemove.MouseButton1Click:Connect(
+
+    function()
+
+        RemoveFrame.Visible =
+            false
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- ENTER TO ADD
+--------------------------------------------------
+
+UsernameBox.FocusLost:Connect(
+
+    function(
+        EnterPressed
+    )
+
+        if EnterPressed
+            and InputFrame.Visible
+        then
+
+            AddUsername(
+                UsernameBox.Text
+            )
+
+
+            UsernameBox.Text =
+                ""
+
+
+            InputFrame.Visible =
+                false
+
+        end
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- DRAG GUI
+--------------------------------------------------
+
+local Dragging =
+    false
+
+local DragStart
+
+local StartPosition
+
+
+Title.InputBegan:Connect(
+
+    function(
+        Input
+    )
+
+        if Input.UserInputType
+            == Enum.UserInputType.MouseButton1
+        then
+
+            Dragging =
+                true
+
+            DragStart =
+                Input.Position
+
+            StartPosition =
+                Main.Position
+
+        end
+
+    end
+
+)
+
+
+Title.InputEnded:Connect(
+
+    function(
+        Input
+    )
+
+        if Input.UserInputType
+            == Enum.UserInputType.MouseButton1
+        then
+
+            Dragging =
+                false
+
+        end
+
+    end
+
+)
+
+
+UserInputService.InputChanged:Connect(
+
+    function(
+        Input
+    )
+
+        if Dragging
+            and Input.UserInputType
+                == Enum.UserInputType.MouseMovement
+        then
+
+            local Delta =
+                Input.Position
+                - DragStart
+
+
+            Main.Position =
+                UDim2.new(
+
+                    StartPosition.X.Scale,
+
+                    StartPosition.X.Offset
+                    + Delta.X,
+
+                    StartPosition.Y.Scale,
+
+                    StartPosition.Y.Offset
+                    + Delta.Y
+
+                )
+
+        end
+
+    end
+
+)
+
+
+--------------------------------------------------
+-- INITIALIZE
+--------------------------------------------------
+
+AddLog(
+    "GUI berhasil dibuat"
+)
+
+
+AddLog(
+    "Loading TradeHistory.json..."
+)
+
+
+local InitialHistory =
+    LoadHistory()
+
+
+if InitialHistory then
+
+    CurrentHistory =
+        InitialHistory
+
+
+    UpdateHistoryGUI(
+        InitialHistory
+    )
+
+
+    AddLog(
+        "Trade History loaded"
+    )
+
+else
+
+    AddLog(
+        "⚠️ File API tidak tersedia"
+    )
+
+end
+
+
+UpdateInfo()
+
+
+SetStatus(
+    "Idle"
+)
+
+
+--------------------------------------------------
+-- AUTO START
+--------------------------------------------------
+
+task.wait(
+    1
+)
+
+
+AddLog(
+    "🚀 AUTO START AKTIF"
+)
+
+
+StartLoop()
