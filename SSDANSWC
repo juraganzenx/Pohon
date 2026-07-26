@@ -603,10 +603,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
     if BigFruit < 250 then
 
 
-        print(
-            "[ACTION] SPRINKLER | Size > 8 =",
-            BigFruit
-        )
+    
 
 
         pcall(function()
@@ -644,10 +641,7 @@ while task.wait(CONFIG.CHECK_DELAY) do
     if SmallFruit < 250 then
 
 
-        print(
-            "[ACTION] WATER | Size > 0.1 =",
-            SmallFruit
-        )
+
 
 
         pcall(function()
