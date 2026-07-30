@@ -1,4 +1,3 @@
---==================================================
 -- HARVEST + SELL + AUTO SEND
 -- PERSISTENT PLAYER LIST
 -- MODERN GUI
@@ -184,84 +183,80 @@ end
 
 local function LoadPlayers()
 
-    table.clear(
-        TARGET_USERNAMES
-    )
+    table.clear(TARGET_USERNAMES)
 
     if not IsFileAPIAvailable() then
 
-        for _, Username in ipairs(
-            DEFAULT_USERNAMES
-        ) do
-
-            table.insert(
-                TARGET_USERNAMES,
-                Username
-            )
-
+        for _, Username in ipairs(DEFAULT_USERNAMES) do
+            table.insert(TARGET_USERNAMES, Username)
         end
 
         return
 
     end
 
+    --==============================
+    -- LOAD FILE
+    --==============================
 
-    if not isfile(
-        PLAYERS_FILE
-    ) then
+    if isfile(PLAYERS_FILE) then
 
-        for _, Username in ipairs(
-            DEFAULT_USERNAMES
-        ) do
+        local Success, Data = pcall(function()
+            return HttpService:JSONDecode(readfile(PLAYERS_FILE))
+        end)
 
-            table.insert(
-                TARGET_USERNAMES,
-                Username
-            )
+        if Success and type(Data) == "table" then
+
+            for _, Username in ipairs(Data) do
+
+                if type(Username) == "string"
+                    and Username ~= "" then
+
+                    table.insert(TARGET_USERNAMES, Username)
+
+                end
+
+            end
 
         end
 
+    end
+
+    --==============================
+    -- MERGE DEFAULT USERNAMES
+    --==============================
+
+    local Changed = false
+
+    for _, Username in ipairs(DEFAULT_USERNAMES) do
+
+        local Exists = false
+
+        for _, Existing in ipairs(TARGET_USERNAMES) do
+
+            if Existing:lower() == Username:lower() then
+                Exists = true
+                break
+            end
+
+        end
+
+        if not Exists then
+
+            table.insert(TARGET_USERNAMES, Username)
+            Changed = true
+
+        end
+
+    end
+
+    --==============================
+    -- CREATE FILE IF MISSING
+    -- OR UPDATE AFTER MERGE
+    --==============================
+
+    if Changed or not isfile(PLAYERS_FILE) then
         SavePlayers()
-
-        return
-
-    end
-
-
-    local Success, Data =
-        pcall(
-            function()
-
-                return
-                    HttpService:JSONDecode(
-                        readfile(
-                            PLAYERS_FILE
-                        )
-                    )
-
-            end
-        )
-
-
-    if Success
-        and type(Data) == "table" then
-
-        for _, Username in ipairs(
-            Data
-        ) do
-
-            if type(Username) == "string"
-                and Username ~= "" then
-
-                table.insert(
-                    TARGET_USERNAMES,
-                    Username
-                )
-
-            end
-
-        end
-
     end
 
 end
