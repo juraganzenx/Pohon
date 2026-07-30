@@ -1,4 +1,4 @@
--- HARVEST + SELL + AUTO SEND
+-- HARVEST + SELL + AUTO SEND HARDCODE NAME
 -- PERSISTENT PLAYER LIST
 -- MODERN GUI
 --
@@ -91,11 +91,50 @@ local NOTE =
 --==================================================
 
 local DEFAULT_USERNAMES = {
+    "SG3ASO",
+    "DK32A0",
+    "12D40D",
+    "A3H1OS",
+    "FHL4WG",
+    "GW24L2",
+    "FH3KDF",
+    "FHK32G",
 
-    "P1",
+    "QY24I1",
+    "ADG21D",
+    "ERT2FL",
+    "AG2L3A",
+    "B42QKS",
+    "GDLT3A",
+    "KRH23G",
+    "HK319E",
 
-    "P2"
+    "A7K2QX",
+    "M9R4TB",
+    "Z1W8NP",
+    "H5CX3L",
+    "Q2V7DM",
+    "T8JX9A",
+    "SDK3DC",
+    "FGN3SH",
 
+    "D3MQ8Z",
+    "X7BT1P",
+    "L9HV5C",
+    "R2WN4K",
+    "F8QJ6Y",
+    "C1ZG9M",
+    "V5XP2T",
+    "ADSH4D",
+
+    "J8RM1Q",
+    "B6TY4N",
+    "K2PX9V",
+    "G7HD3Z",
+    "W1CF8L",
+    "T5MN2R",
+    "Q9XA6J",
+    "E4VK7P"
 }
 
 
@@ -185,78 +224,8 @@ local function LoadPlayers()
 
     table.clear(TARGET_USERNAMES)
 
-    if not IsFileAPIAvailable() then
-
-        for _, Username in ipairs(DEFAULT_USERNAMES) do
-            table.insert(TARGET_USERNAMES, Username)
-        end
-
-        return
-
-    end
-
-    --==============================
-    -- LOAD FILE
-    --==============================
-
-    if isfile(PLAYERS_FILE) then
-
-        local Success, Data = pcall(function()
-            return HttpService:JSONDecode(readfile(PLAYERS_FILE))
-        end)
-
-        if Success and type(Data) == "table" then
-
-            for _, Username in ipairs(Data) do
-
-                if type(Username) == "string"
-                    and Username ~= "" then
-
-                    table.insert(TARGET_USERNAMES, Username)
-
-                end
-
-            end
-
-        end
-
-    end
-
-    --==============================
-    -- MERGE DEFAULT USERNAMES
-    --==============================
-
-    local Changed = false
-
     for _, Username in ipairs(DEFAULT_USERNAMES) do
-
-        local Exists = false
-
-        for _, Existing in ipairs(TARGET_USERNAMES) do
-
-            if Existing:lower() == Username:lower() then
-                Exists = true
-                break
-            end
-
-        end
-
-        if not Exists then
-
-            table.insert(TARGET_USERNAMES, Username)
-            Changed = true
-
-        end
-
-    end
-
-    --==============================
-    -- CREATE FILE IF MISSING
-    -- OR UPDATE AFTER MERGE
-    --==============================
-
-    if Changed or not isfile(PLAYERS_FILE) then
-        SavePlayers()
+        table.insert(TARGET_USERNAMES, Username)
     end
 
 end
