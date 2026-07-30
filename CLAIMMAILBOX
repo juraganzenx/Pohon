@@ -1,0 +1,7 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Networking = require(ReplicatedStorage.SharedModules.Networking)
+
+while true do
+    Networking.Mailbox.ClaimAll:Fire()
+    task.wait(30)
+end
