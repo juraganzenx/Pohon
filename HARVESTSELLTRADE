@@ -1,4 +1,4 @@
--- HARVEST + SELL + AUTO SEND HARDCODE NAME
+-- HARVEST + SELL + AUTO SEND HARDCODE NAMEe
 -- PERSISTENT PLAYER LIST
 -- MODERN GUI
 --
@@ -56,7 +56,7 @@ local Backpack =
 -- CONFIG
 --==================================================
 
-local _MULTIPLIER_LIMIT = 0.1 --INI TADINYA 8 , ini size yang lebih dari ini maka di favorite , tidak di jual
+local SIZE_MULTIPLIER_LIMIT = 8
 
 local FAVORITE_DELAY = 0.05
 
@@ -70,7 +70,7 @@ local AFTER_HARVEST_DELAY = 1
 
 local LOOP_DELAY = 2
 
-local SIZE_THRESHOLD = 8 -- INI tuh Jika lebih dari ini maka Harvestnya tunggu Mutasi
+local SIZE_THRESHOLD = 8
 
 local TARGET_VALUE = 1000000000
 
@@ -95,10 +95,19 @@ local DEFAULT_USERNAMES = {
     "DK32A0",
     "12D40D",
     "A3H1OS",
-    "J8RM1Q",
-    "B6TY4N",
+    "FHL4WG",
+    "GW24L2",
     "FH3KDF",
     "FHK32G",
+
+    "QY24I1",
+    "ADG21D",
+    "ERT2FL",
+    "AG2L3A",
+    "B42QKS",
+    "GDLT3A",
+    "KRH23G",
+    "HK319E",
 
     "A7K2QX",
     "M9R4TB",
@@ -109,41 +118,23 @@ local DEFAULT_USERNAMES = {
     "SDK3DC",
     "FGN3SH",
 
-    "QY24I1",
-    "ADG21D",
-    "ERT2FL",
-    "AG2L3A",
-    "B42QKS",
-    "GDLT3A",
-    "KRH23G",
+    "D3MQ8Z",
+    "X7BT1P",
+    "L9HV5C",
+    "R2WN4K",
+    "F8QJ6Y",
+    "C1ZG9M",
+    "V5XP2T",
+    "ADSH4D",
+
+    "J8RM1Q",
+    "B6TY4N",
     "K2PX9V",
-
-    "R5CW8M",
-    "N1QX6T",
-    "Z7LH2P",
-    "K4VB9J",
-    "D8YR3F",
-    "T2MG5X",
-    "P9CN1W",
-    "H6KQ4L",
-
-    "V3JP8N",
-    "Q7TF2H",
-    "M1XZ6R",
-    "C5LW9K",
-    "Y4DB7P",
-    "N8RV3T",
-    "F2HQ1M",
-    "K9XC5Z",
-
-    "W6MN2J",
-    "P4QH8X",
-    "T1ZK7C",
-    "L9RF3V",
-    "X5DG2N",
-    "H8YP6M",
-    "C7TJ4Q",
-    "R1VL9B"
+    "G7HD3Z",
+    "W1CF8L",
+    "T5MN2R",
+    "Q9XA6J",
+    "E4VK7P"
 }
 
 
