@@ -10,6 +10,7 @@ local function Execute(url)
     end)
 end
 
+Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/DESTROYPLANT")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/HARVESTSELLTRADE")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/PLANT")
 Execute("https://raw.githubusercontent.com/juraganzenx/Pohon/refs/heads/main/SSDANSWC")
