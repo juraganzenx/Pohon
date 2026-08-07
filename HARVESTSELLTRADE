@@ -56,7 +56,7 @@ local Backpack =
 -- CONFIG
 --==================================================
 
-local SIZE_MULTIPLIER_LIMIT = 8
+local SIZE_MULTIPLIER_LIMIT = 1
 
 local FAVORITE_DELAY = 0.05
 
