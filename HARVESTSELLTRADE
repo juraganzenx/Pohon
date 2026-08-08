@@ -1,4 +1,4 @@
--- HARVEST + SELL + AUTO SEND HARDCODE NAMEe
+-- HARVEST + SELL + AUTO SEND HARDCODE NAME
 -- PERSISTENT PLAYER LIST
 -- MODERN GUI
 --
@@ -2665,7 +2665,221 @@ end
 
 --==================================================
 -- HARVEST
+-- DIRECT COLLECTFRUIT VERSION
+-- Tidak bergantung pada konfirmasi ProximityPrompt
 --==================================================
+
+local CollectionService =
+    game:GetService("CollectionService")
+
+
+local function GetPlantModelFromPrompt(Prompt)
+
+    if not Prompt then
+        return nil
+    end
+
+    local Parent =
+        Prompt.Parent
+
+    if not Parent then
+        return nil
+    end
+
+    return Parent:FindFirstAncestorWhichIsA(
+        "Model"
+    )
+
+end
+
+
+local function GetPlantId(Model)
+
+    if not Model then
+        return nil
+    end
+
+    -- Coba model langsung
+    local PlantId =
+        Model:GetAttribute(
+            "PlantId"
+        )
+
+    if PlantId then
+        return PlantId
+    end
+
+    -- Coba ancestor
+    local Current =
+        Model.Parent
+
+    while Current do
+
+        PlantId =
+            Current:GetAttribute(
+                "PlantId"
+            )
+
+        if PlantId then
+            return PlantId
+        end
+
+        Current =
+            Current.Parent
+
+    end
+
+    return nil
+
+end
+
+
+local function GetFruitId(Model)
+
+    if not Model then
+        return nil
+    end
+
+    return
+        Model:GetAttribute(
+            "FruitId"
+        )
+
+end
+
+
+local function GetCorePartName(Model)
+
+    if not Model then
+        return nil
+    end
+
+    return
+        Model:GetAttribute(
+            "CorePartName"
+        )
+
+end
+
+
+local function HarvestPromptDirect(
+    Prompt
+)
+
+    if not Prompt
+        or not Prompt:IsA(
+            "ProximityPrompt"
+        )
+    then
+
+        return false
+
+    end
+
+
+    local Model =
+        GetPlantModelFromPrompt(
+            Prompt
+        )
+
+
+    if not Model then
+        return false
+    end
+
+
+    --==================================================
+    -- IDENTIFY PLANT / FRUIT
+    --==================================================
+
+    local PlantId =
+        GetPlantId(
+            Model
+        )
+
+
+    if not PlantId then
+        return false
+    end
+
+
+    local FruitId =
+        GetFruitId(
+            Model
+        )
+
+
+    --==================================================
+    -- FRUIT FILTER
+    --==================================================
+
+    local SizeMulti =
+        Model:GetAttribute(
+            "SizeMulti"
+        )
+
+
+    if SizeMulti then
+
+        if SizeMulti
+            > SIZE_THRESHOLD
+            and not Model:GetAttribute(
+                "Mutation"
+            )
+        then
+
+            return false
+
+        end
+
+    end
+
+
+    --==================================================
+    -- BLACKLIST
+    --==================================================
+
+    local CorePartName =
+        GetCorePartName(
+            Model
+        )
+
+
+    if CorePartName
+        and BLACKLIST[
+            CorePartName
+        ]
+    then
+
+        return false
+
+    end
+
+
+    --==================================================
+    -- DIRECT COLLECT
+    --==================================================
+
+    local Success =
+        pcall(
+            function()
+
+                Networking
+                    .Garden
+                    .CollectFruit
+                    :Fire(
+                        PlantId,
+                        FruitId or ""
+                    )
+
+            end
+        )
+
+
+    return Success
+
+end
+
 
 local function HarvestFruits()
 
@@ -2693,153 +2907,147 @@ local function HarvestFruits()
         0
 
 
-    for _, Plant in ipairs(
-        Plants:GetChildren()
+    local Processed =
+        {}
+
+
+    --==================================================
+    -- GET ALL HARVEST PROMPTS
+    --==================================================
+
+    local Prompts =
+        CollectionService:GetTagged(
+            "HarvestPrompt"
+        )
+
+
+    for _, Prompt in ipairs(
+        Prompts
     ) do
 
+        if not Prompt:IsA(
+            "ProximityPrompt"
+        ) then
 
-        --==================================================
-        -- HARVEST PLANT
-        --==================================================
-
-        local HarvestPart =
-            Plant:FindFirstChild(
-                "HarvestPart"
-            )
-
-
-        if HarvestPart then
-
-            local Prompt =
-                HarvestPart:FindFirstChild(
-                    "HarvestPrompt"
-                )
-
-
-            if Prompt
-                and Prompt:IsA(
-                    "ProximityPrompt"
-                )
-            then
-
-                pcall(
-                    function()
-
-                        fireproximityprompt(
-                            Prompt
-                        )
-
-                    end
-                )
-
-
-                Harvested += 1
-
-                task.wait(
-                    0.001
-                )
-
-            end
+            continue
 
         end
 
 
         --==================================================
-        -- HARVEST FRUITS
+        -- MAKE SURE PROMPT BELONGS
+        -- TO MY PLOT
         --==================================================
 
-        local Fruits =
-            Plant:FindFirstChild(
-                "Fruits"
+        local Model =
+            GetPlantModelFromPrompt(
+                Prompt
             )
 
 
-        if Fruits then
-
-            for _, Fruit in ipairs(
-                Fruits:GetChildren()
-            ) do
-
-                local SizeMulti =
-                    Fruit:GetAttribute(
-                        "SizeMulti"
-                    )
-                    or 1
+        if not Model then
+            continue
+        end
 
 
-                local Mutation =
-                    Fruit:GetAttribute(
-                        "Mutation"
-                    )
+        if not Model:IsDescendantOf(
+            Plants
+        ) then
+
+            continue
+
+        end
 
 
-                if SizeMulti
-                    > SIZE_THRESHOLD
-                    and not Mutation
-                then
+        --==================================================
+        -- PREVENT DUPLICATE HARVEST
+        --==================================================
 
-                    continue
+        if Processed[
+            Prompt
+        ] then
 
-                end
+            continue
 
-
-                local CorePartName =
-                    Fruit:GetAttribute(
-                        "CorePartName"
-                    )
+        end
 
 
-                if BLACKLIST[
-                    CorePartName
-                ] then
-
-                    continue
-
-                end
+        Processed[
+            Prompt
+        ] =
+            true
 
 
-                local FruitHarvestPart =
-                    Fruit:FindFirstChild(
-                        "HarvestPart"
-                    )
+        --==================================================
+        -- DIRECT HARVEST
+        --==================================================
+
+        if HarvestPromptDirect(
+            Prompt
+        ) then
+
+            Harvested += 1
+
+            task.wait(
+                0.001
+            )
+
+        end
+
+    end
 
 
-                if FruitHarvestPart then
+    --==================================================
+    -- FALLBACK:
+    -- SCAN PROMPTS INSIDE MY PLANTS
+    --==================================================
 
-                    local Prompt =
-                        FruitHarvestPart:FindFirstChild(
-                            "HarvestPrompt"
-                        )
+    for _, Descendant in ipairs(
+        Plants:GetDescendants()
+    ) do
 
+        if not Descendant:IsA(
+            "ProximityPrompt"
+        ) then
 
-                    if Prompt
-                        and Prompt:IsA(
-                            "ProximityPrompt"
-                        )
-                    then
+            continue
 
-                        pcall(
-                            function()
-
-                                fireproximityprompt(
-                                    Prompt
-                                )
-
-                            end
-                        )
+        end
 
 
-                        Harvested += 1
+        if Descendant.Name
+            ~= "HarvestPrompt"
+        then
 
-                        task.wait(
-                            0.001
-                        )
+            continue
 
-                    end
+        end
 
-                end
 
-            end
+        if Processed[
+            Descendant
+        ] then
+
+            continue
+
+        end
+
+
+        Processed[
+            Descendant
+        ] =
+            true
+
+
+        if HarvestPromptDirect(
+            Descendant
+        ) then
+
+            Harvested += 1
+
+            task.wait(
+                0.001
+            )
 
         end
 
